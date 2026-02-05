@@ -1,4 +1,4 @@
-# Remvin Enterprise LTD Sales Manager
+# Remvin Enterprise Sales Manager
 
 **Complete Desktop Sales & Inventory Management Application**
 

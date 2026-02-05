@@ -143,7 +143,7 @@ export default function ReportsScreen({ navigation }: any) {
       setRawProductsData(productsData?.data || []);
       setRawCustomersData(customersData?.data || []);
     } catch (error: any) {
-      console.error('Error loading raw data:', error);
+
     } finally {
       setLoading(false);
     }

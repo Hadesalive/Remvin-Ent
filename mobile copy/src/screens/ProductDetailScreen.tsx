@@ -57,7 +57,7 @@ export default function ProductDetailScreen({ navigation, route }: any) {
       ]);
       
       if (productsResult.error) {
-        console.error('Error loading products:', productsResult.error);
+
         navigation.goBack();
         return;
       }
@@ -84,7 +84,7 @@ export default function ProductDetailScreen({ navigation, route }: any) {
         }
       }
     } catch (error: any) {
-      console.error('Failed to load product:', error);
+
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -149,7 +149,7 @@ export default function ProductDetailScreen({ navigation, route }: any) {
                 },
               ]);
             } catch (error: any) {
-              console.error('Failed to delete product:', error);
+
               Alert.alert('Error', 'Failed to delete product. Please try again.');
             } finally {
               setDeleting(false);
@@ -240,6 +240,8 @@ export default function ProductDetailScreen({ navigation, route }: any) {
             accessibilityLabel: 'Delete product',
           },
         ]}
+        useSafeArea={false}
+        showBorder={false}
       />
 
       <ScrollView 

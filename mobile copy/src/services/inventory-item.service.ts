@@ -55,7 +55,6 @@ export const InventoryItemService = {
 
       return { data: items, error: null };
     } catch (error: any) {
-      console.error('Error fetching inventory items:', error);
       return { data: null, error };
     }
   },
@@ -95,7 +94,6 @@ export const InventoryItemService = {
         error: null,
       };
     } catch (error: any) {
-      console.error('Error fetching inventory item:', error);
       return { data: null, error };
     }
   },
@@ -141,7 +139,6 @@ export const InventoryItemService = {
         error: null,
       };
     } catch (error: any) {
-      console.error('Error fetching inventory item by IMEI:', error);
       return { data: null, error };
     }
   },
@@ -206,7 +203,6 @@ export const InventoryItemService = {
         error: null,
       };
     } catch (error: any) {
-      console.error('Error creating inventory item:', error);
       return { data: null, error };
     }
   },
@@ -275,7 +271,6 @@ export const InventoryItemService = {
         error: null,
       };
     } catch (error: any) {
-      console.error('Error updating inventory item:', error);
       return { data: null, error };
     }
   },
@@ -294,7 +289,6 @@ export const InventoryItemService = {
 
       return { data: true, error: null };
     } catch (error: any) {
-      console.error('Error deleting inventory item:', error);
       return { data: false, error };
     }
   },
@@ -315,7 +309,6 @@ export const InventoryItemService = {
 
       return { data: count || 0, error: null };
     } catch (error: any) {
-      console.error('Error getting in-stock count:', error);
       return { data: 0, error };
     }
   },

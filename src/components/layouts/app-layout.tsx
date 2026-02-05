@@ -18,7 +18,7 @@ import { IconAlertCircle, IconAlertTriangle, IconCheck } from '@tabler/icons-rea
 function AppLayoutContent() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [pageTitle, setPageTitle] = useState('Remvin Enterprise LTD Sales Manager');
+    const [pageTitle, setPageTitle] = useState('Remvin Enterprise Sales Manager');
     const location = useLocation();
     const navigate = useNavigate();
     const pathname = location.pathname;
@@ -87,7 +87,7 @@ function AppLayoutContent() {
         if (pathname.startsWith('/settings')) {
             return 'Settings';
         }
-        return 'Remvin Enterprise LTD Sales Manager';
+        return 'Remvin Enterprise Sales Manager';
     }, [pathname]);
 
     // Update page title when route or search params change

@@ -18,12 +18,20 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { SettingsService, Preferences, CompanySettings } from '../services/settings.service';
 import { spacing, fontSize, fontWeight } from '../lib/theme';
 import { Header } from '../components/ui/Header';
 
-export default function SettingsScreen({ navigation }: any) {
-  const { colors, isDark } = useTheme();
+interface SettingsScreenProps {
+  navigation: {
+    goBack: () => void;
+  };
+}
+
+export default function SettingsScreen({ navigation }: SettingsScreenProps) {
+  const { colors, isDark, themeMode, setThemeMode } = useTheme();
+  const { user, logout } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'company'>('general');
@@ -72,24 +80,10 @@ export default function SettingsScreen({ navigation }: any) {
       ]);
       setPreferences(prefs);
       setCompanySettings(company);
-    } catch (error: any) {
-      console.error('Failed to load settings:', error);
+    } catch (error: unknown) {
       Alert.alert('Error', 'Failed to load settings');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSavePreferences = async () => {
-    try {
-      setSaving(true);
-      await SettingsService.updatePreferences(preferences);
-      Alert.alert('Success', 'Preferences saved successfully');
-    } catch (error: any) {
-      console.error('Failed to save preferences:', error);
-      Alert.alert('Error', 'Failed to save preferences');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -115,8 +109,7 @@ export default function SettingsScreen({ navigation }: any) {
       
       await SettingsService.updateCompanySettings(companySettings);
       Alert.alert('Success', 'Company settings saved successfully');
-    } catch (error: any) {
-      console.error('Failed to save company settings:', error);
+    } catch (error: unknown) {
       Alert.alert('Error', 'Failed to save company settings');
     } finally {
       setSaving(false);
@@ -186,203 +179,91 @@ export default function SettingsScreen({ navigation }: any) {
       >
         {activeTab === 'general' ? (
           <>
-            {/* Sales Preferences */}
+            {/* App Appearance */}
             <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.sectionHeader}>
-                <Ionicons name="receipt-outline" size={20} color={colors.accent} />
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Sales Preferences</Text>
+                <Ionicons name="color-palette-outline" size={20} color={colors.accent} />
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Appearance</Text>
               </View>
 
               <View style={styles.settingRow}>
                 <View style={styles.settingLeft}>
-                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>Default Payment Method</Text>
+                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>Theme</Text>
                   <Text style={[styles.settingDescription, { color: colors.mutedForeground }]}>
-                    Default payment method for new sales
+                    Choose light, dark, or follow system
                   </Text>
                 </View>
-                <View style={styles.settingRight}>
+                <View style={styles.themeModeRow}>
+                  {(['system', 'light', 'dark'] as const).map(mode => (
+                    <TouchableOpacity
+                      key={mode}
+                      style={[
+                        styles.themeModeChip,
+                        {
+                          borderColor: themeMode === mode ? colors.accent : colors.border,
+                          backgroundColor:
+                            themeMode === mode ? colors.accent + '15' : colors.input,
+                        },
+                      ]}
+                      onPress={() => {
+                        setThemeMode(mode);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.themeModeChipText,
+                          {
+                            color: themeMode === mode ? colors.accent : colors.mutedForeground,
+                          },
+                        ]}
+                      >
+                        {mode === 'system'
+                          ? 'System'
+                          : mode.charAt(0).toUpperCase() + mode.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            {/* Account / Session */}
+            <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.sectionHeader}>
+                <Ionicons name="person-circle-outline" size={20} color={colors.accent} />
+                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Account</Text>
+              </View>
+
+              {user && (
+                <View style={styles.accountRow}>
+                  <View style={styles.accountInfo}>
+                    <Text style={[styles.accountName, { color: colors.foreground }]}>
+                      {user.fullName || user.username}
+                    </Text>
+                    <Text style={[styles.accountDetail, { color: colors.mutedForeground }]}>
+                      @{user.username} • {user.role.toUpperCase()}
+                    </Text>
+                  </View>
                   <TouchableOpacity
-                    style={[styles.selectButton, { backgroundColor: colors.input, borderColor: colors.border }]}
-                    onPress={() => {
-                      Alert.alert(
-                        'Payment Method',
-                        'Select default payment method',
-                        [
-                          { text: 'Cash', onPress: () => setPreferences({ ...preferences, defaultPaymentMethod: 'cash' }) },
-                          { text: 'Card', onPress: () => setPreferences({ ...preferences, defaultPaymentMethod: 'card' }) },
-                          { text: 'Bank Transfer', onPress: () => setPreferences({ ...preferences, defaultPaymentMethod: 'bank_transfer' }) },
-                          { text: 'Store Credit', onPress: () => setPreferences({ ...preferences, defaultPaymentMethod: 'credit' }) },
-                          { text: 'Other', onPress: () => setPreferences({ ...preferences, defaultPaymentMethod: 'other' }) },
-                          { text: 'Cancel', style: 'cancel' },
-                        ]
-                      );
+                    style={[styles.logoutButton, { borderColor: colors.destructive }]}
+                    onPress={async () => {
+                      await logout();
                     }}
                   >
-                    <Text style={[styles.selectButtonText, { color: colors.foreground }]}>
-                      {preferences.defaultPaymentMethod.charAt(0).toUpperCase() + preferences.defaultPaymentMethod.slice(1).replace('_', ' ')}
+                    <Ionicons
+                      name="log-out-outline"
+                      size={18}
+                      color={colors.destructive}
+                    />
+                    <Text
+                      style={[styles.logoutText, { color: colors.destructive }]}
+                    >
+                      Logout
                     </Text>
-                    <Ionicons name="chevron-down" size={18} color={colors.mutedForeground} />
                   </TouchableOpacity>
                 </View>
-              </View>
-
-              <View style={[styles.settingRow, { borderTopColor: colors.border }]}>
-                <View style={styles.settingLeft}>
-                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>Default Discount %</Text>
-                  <Text style={[styles.settingDescription, { color: colors.mutedForeground }]}>
-                    Default discount percentage for new sales
-                  </Text>
-                </View>
-                <View style={styles.settingRight}>
-                  <TextInput
-                    style={[styles.numberInput, { backgroundColor: colors.input, color: colors.foreground, borderColor: colors.border }]}
-                    value={String(preferences.defaultDiscountPercent)}
-                    onChangeText={(text) => {
-                      const num = parseFloat(text) || 0;
-                      setPreferences({ ...preferences, defaultDiscountPercent: Math.max(0, Math.min(100, num)) });
-                    }}
-                    keyboardType="decimal-pad"
-                    placeholder="0"
-                  />
-                </View>
-              </View>
-
-              <View style={[styles.settingRow, { borderTopColor: colors.border }]}>
-                <View style={styles.settingLeft}>
-                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>Auto Calculate Tax</Text>
-                  <Text style={[styles.settingDescription, { color: colors.mutedForeground }]}>
-                    Automatically calculate tax on sales
-                  </Text>
-                </View>
-                <Switch
-                  value={preferences.autoCalculateTax}
-                  onValueChange={(value) => setPreferences({ ...preferences, autoCalculateTax: value })}
-                  trackColor={{ false: colors.muted, true: colors.accent + '50' }}
-                  thumbColor={preferences.autoCalculateTax ? colors.accent : colors.mutedForeground}
-                />
-              </View>
-
-              <View style={[styles.settingRow, { borderTopColor: colors.border }]}>
-                <View style={styles.settingLeft}>
-                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>Show Tax Breakdown</Text>
-                  <Text style={[styles.settingDescription, { color: colors.mutedForeground }]}>
-                    Show tax breakdown on receipts
-                  </Text>
-                </View>
-                <Switch
-                  value={preferences.showTaxBreakdown}
-                  onValueChange={(value) => setPreferences({ ...preferences, showTaxBreakdown: value })}
-                  trackColor={{ false: colors.muted, true: colors.accent + '50' }}
-                  thumbColor={preferences.showTaxBreakdown ? colors.accent : colors.mutedForeground}
-                />
-              </View>
-
-              <View style={[styles.settingRow, { borderTopColor: colors.border }]}>
-                <View style={styles.settingLeft}>
-                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>Require Customer Info</Text>
-                  <Text style={[styles.settingDescription, { color: colors.mutedForeground }]}>
-                    Require customer information for sales
-                  </Text>
-                </View>
-                <Switch
-                  value={preferences.requireCustomerInfo}
-                  onValueChange={(value) => setPreferences({ ...preferences, requireCustomerInfo: value })}
-                  trackColor={{ false: colors.muted, true: colors.accent + '50' }}
-                  thumbColor={preferences.requireCustomerInfo ? colors.accent : colors.mutedForeground}
-                />
-              </View>
-            </View>
-
-            {/* Receipt Preferences */}
-            <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="document-text-outline" size={20} color={colors.accent} />
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Receipt Preferences</Text>
-              </View>
-
-              <View style={styles.settingRow}>
-                <View style={styles.settingLeft}>
-                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>Invoice Number Format</Text>
-                  <Text style={[styles.settingDescription, { color: colors.mutedForeground }]}>
-                    Format for invoice numbers
-                  </Text>
-                </View>
-                <TextInput
-                  style={[styles.input, { backgroundColor: colors.input, color: colors.foreground, borderColor: colors.border }]}
-                  value={preferences.invoiceNumberFormat}
-                  onChangeText={(text) => setPreferences({ ...preferences, invoiceNumberFormat: text })}
-                  placeholder="INV-{YYYY}-{MM}-{####}"
-                />
-              </View>
-
-              <View style={[styles.settingRow, { borderTopColor: colors.border }]}>
-                <View style={styles.settingLeft}>
-                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>Receipt Footer</Text>
-                  <Text style={[styles.settingDescription, { color: colors.mutedForeground }]}>
-                    Footer text on receipts
-                  </Text>
-                </View>
-                <TextInput
-                  style={[styles.textArea, { backgroundColor: colors.input, color: colors.foreground, borderColor: colors.border }]}
-                  value={preferences.receiptFooter}
-                  onChangeText={(text) => setPreferences({ ...preferences, receiptFooter: text })}
-                  placeholder="Thank you for your business!"
-                  multiline
-                  numberOfLines={2}
-                />
-              </View>
-
-              <View style={[styles.settingRow, { borderTopColor: colors.border }]}>
-                <View style={styles.settingLeft}>
-                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>Print Receipts</Text>
-                  <Text style={[styles.settingDescription, { color: colors.mutedForeground }]}>
-                    Automatically print receipts after sale
-                  </Text>
-                </View>
-                <Switch
-                  value={preferences.printReceipts}
-                  onValueChange={(value) => setPreferences({ ...preferences, printReceipts: value })}
-                  trackColor={{ false: colors.muted, true: colors.accent + '50' }}
-                  thumbColor={preferences.printReceipts ? colors.accent : colors.mutedForeground}
-                />
-              </View>
-            </View>
-
-            {/* App Preferences */}
-            <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.sectionHeader}>
-                <Ionicons name="settings-outline" size={20} color={colors.accent} />
-                <Text style={[styles.sectionTitle, { color: colors.foreground }]}>App Preferences</Text>
-              </View>
-
-              <View style={styles.settingRow}>
-                <View style={styles.settingLeft}>
-                  <Text style={[styles.settingLabel, { color: colors.foreground }]}>Sound Effects</Text>
-                  <Text style={[styles.settingDescription, { color: colors.mutedForeground }]}>
-                    Play sound effects for actions
-                  </Text>
-                </View>
-                <Switch
-                  value={preferences.soundEffects}
-                  onValueChange={(value) => setPreferences({ ...preferences, soundEffects: value })}
-                  trackColor={{ false: colors.muted, true: colors.accent + '50' }}
-                  thumbColor={preferences.soundEffects ? colors.accent : colors.mutedForeground}
-                />
-              </View>
-            </View>
-
-            {/* Save Button */}
-            <TouchableOpacity
-              style={[styles.saveButton, { backgroundColor: colors.accent }]}
-              onPress={handleSavePreferences}
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color={colors.accentContrast} />
-              ) : (
-                <Text style={[styles.saveButtonText, { color: colors.accentContrast }]}>Save Preferences</Text>
               )}
-            </TouchableOpacity>
+            </View>
           </>
         ) : (
           <>
@@ -500,6 +381,53 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: fontSize.base,
+  },
+  themeModeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  themeModeChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  themeModeChipText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+  },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  accountInfo: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  accountName: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.semibold,
+  },
+  accountDetail: {
+    fontSize: fontSize.sm,
+    marginTop: spacing.xs,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  logoutText: {
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
   },
   tabs: {
     flexDirection: 'row',

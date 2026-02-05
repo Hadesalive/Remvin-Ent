@@ -1,7 +1,7 @@
 {
   "name": "remvin-enterprise",
   "version": "1.0.0",
-  "description": "Remvin Enterprise LTD - Professional sales management and invoicing desktop application",
+  "description": "Remvin Enterprise - Professional sales management and invoicing desktop application",
   "author": "Alpha Amadu Bah",
   "private": true,
   "main": "electron/main.js",
@@ -93,7 +93,7 @@
   },
   "build": {
     "appId": "com.RemvinEnterprise.sales-manager",
-    "productName": "Remvin Enterprise LTD",
+    "productName": "Remvin Enterprise",
     "directories": {
       "output": "release",
       "buildResources": "public"
@@ -149,7 +149,7 @@
       "uninstallerIcon": "public/icon.ico",
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": true,
-      "shortcutName": "Remvin Enterprise LTD",
+      "shortcutName": "Remvin Enterprise",
       "menuCategory": "Business",
       "include": "build/installer.nsh",
       "installerHeaderIcon": "public/icon.ico",

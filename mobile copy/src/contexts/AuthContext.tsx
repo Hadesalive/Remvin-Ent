@@ -6,13 +6,11 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AuthService } from '../services/auth.service';
-import { DemoAuthService } from '../services/auth.service.demo';
 import { ROLE_PERMISSIONS } from '../lib/constants';
 import type { User, ApiResponse } from '../types';
 import type { UserRole, Permission } from '../lib/constants';
 
-// Set to true for demo mode (no Supabase connection)
-const USE_DEMO_MODE = true;
+// Use real Supabase authentication
 
 interface AuthContextType {
   user: User | null;
@@ -42,13 +40,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const initializeAuth = async () => {
     try {
-      const service = USE_DEMO_MODE ? DemoAuthService : AuthService;
-      const { data: currentUser } = await service.getCurrentUser(''); // Empty string for init check
+      const currentUser = await AuthService.getCurrentUser();
       if (currentUser) {
         setUser(currentUser);
       }
-    } catch (error) {
-      console.error('Error initializing auth:', error);
+    } catch {
     } finally {
       setIsLoading(false);
     }
@@ -57,18 +53,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = useCallback(
     async (username: string, password: string): Promise<ApiResponse<User>> => {
       try {
-        const service = USE_DEMO_MODE ? DemoAuthService : AuthService;
-        const result = await service.signIn(username, password);
+        const result = await AuthService.signIn(username, password);
 
         if (result.data) {
           setUser(result.data);
           return { success: true, data: result.data };
         }
 
-        return { success: false, error: result.error?.message || 'Login failed' };
-      } catch (error: any) {
-        console.error('Login error:', error);
-        return { success: false, error: 'An unexpected error occurred' };
+        const errorMsg = typeof result.error === 'string' 
+          ? result.error 
+          : (result.error && typeof result.error === 'object' && 'message' in result.error)
+            ? (result.error as { message: string }).message
+            : 'Login failed';
+        return { success: false, error: errorMsg };
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+        return { success: false, error: errorMessage };
       }
     },
     []
@@ -76,11 +76,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = useCallback(async () => {
     try {
-      const service = USE_DEMO_MODE ? DemoAuthService : AuthService;
-      await service.signOut();
+      await AuthService.signOut();
       setUser(null);
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch {
     }
   }, []);
 
@@ -106,16 +104,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!user?.id) return;
 
     try {
-      const service = USE_DEMO_MODE ? DemoAuthService : AuthService;
-      const { data: currentUser } = await service.getCurrentUser(user.id);
+      const currentUser = await AuthService.getCurrentUser();
       if (currentUser) {
         setUser(currentUser);
       } else {
         // User no longer valid
         await logout();
       }
-    } catch (error) {
-      console.error('Error refreshing user:', error);
+    } catch {
     }
   }, [user?.id, logout]);
 

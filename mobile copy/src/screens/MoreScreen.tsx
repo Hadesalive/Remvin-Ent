@@ -46,12 +46,28 @@ export default function MoreScreen({ navigation }: any) {
       onPress: () => navigation.navigate('SwapsList'),
     },
     {
+      id: 'returns',
+      title: 'Returns',
+      subtitle: 'Handle returns and exchanges',
+      icon: 'return-down-back-outline',
+      color: '#F59E0B',
+      onPress: () => navigation.navigate('ReturnsList'),
+    },
+    {
       id: 'debts',
       title: 'Debts',
       subtitle: 'Manage customer debts',
       icon: 'receipt-outline',
       color: '#EF4444',
       onPress: () => navigation.navigate('DebtList'),
+    },
+    {
+      id: 'notes',
+      title: 'Notes',
+      subtitle: 'Journal and quick notes',
+      icon: 'document-text-outline',
+      color: '#8B5CF6',
+      onPress: () => navigation.navigate('NotesList'),
     },
     {
       id: 'settings',
@@ -77,9 +93,15 @@ export default function MoreScreen({ navigation }: any) {
       subtitle: 'Manage invoices',
       icon: 'document-text-outline',
       color: '#3B82F6',
-      onPress: () => {
-        // TODO: Navigate to invoices
-      },
+      onPress: () => navigation.navigate('InvoiceList'),
+    },
+    {
+      id: 'users',
+      title: 'Users',
+      subtitle: 'Manage users and permissions',
+      icon: 'people-outline',
+      color: '#8B5CF6',
+      onPress: () => navigation.navigate('UserList'),
     },
   ];
 

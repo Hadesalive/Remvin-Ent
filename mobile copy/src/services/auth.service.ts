@@ -45,7 +45,6 @@ export const AuthService = {
 
       return { success: false, error: response.error || 'Login failed' };
     } catch (error: any) {
-      console.error('Sign in error:', error);
       return { success: false, error: 'An unexpected error occurred' };
     }
   },
@@ -57,7 +56,6 @@ export const AuthService = {
     try {
       await SecureStore.deleteItemAsync(SESSION_KEY);
     } catch (error) {
-      console.error('Sign out error:', error);
     }
   },
 
@@ -95,7 +93,6 @@ export const AuthService = {
 
       return null;
     } catch (error) {
-      console.error('Get current user error:', error);
       return null;
     }
   },
@@ -118,7 +115,6 @@ export const AuthService = {
 
       return session;
     } catch (error) {
-      console.error('Get session error:', error);
       return null;
     }
   },
@@ -145,7 +141,6 @@ export const AuthService = {
       const response = data as ApiResponse;
       return response;
     } catch (error: any) {
-      console.error('Change password error:', error);
       return { success: false, error: 'An unexpected error occurred' };
     }
   },

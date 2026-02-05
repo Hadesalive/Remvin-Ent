@@ -16,17 +16,31 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { InventoryItemService } from '../services/inventory-item.service';
 import { DatabaseService } from '../services/database.service';
-import { InventoryItem, Product } from '../types';
+import { Product } from '../types';
 import { spacing, fontSize, fontWeight } from '../lib/theme';
 import { SelectionModal } from '../components/ui/SelectionModal';
 
-export default function NewInventoryItemScreen({ navigation, route }: any) {
+interface NewInventoryItemScreenProps {
+  navigation: {
+    goBack: () => void;
+    navigate: (screen: string, params?: { itemId?: string; productId?: string }) => void;
+  };
+  route: {
+    params?: {
+      itemId?: string;
+      productId?: string;
+    };
+  };
+}
+
+export default function NewInventoryItemScreen({ navigation, route }: NewInventoryItemScreenProps) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const itemId = route?.params?.itemId;
   const productId = route?.params?.productId; // Pre-selected product
   const isEditMode = !!itemId;
@@ -44,20 +58,9 @@ export default function NewInventoryItemScreen({ navigation, route }: any) {
   const [showProductModal, setShowProductModal] = useState(false);
   const [showConditionModal, setShowConditionModal] = useState(false);
   const [showSimModal, setShowSimModal] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loadingItem, setLoadingItem] = useState(false);
   const hasLoadedProducts = useRef(false);
-
-  useEffect(() => {
-    const initialize = async () => {
-      await loadProducts();
-      if (isEditMode && itemId) {
-        await loadItem();
-      }
-    };
-    initialize();
-  }, [itemId, isEditMode]);
 
   const selectedProduct = products.find(p => p.id === productIdState);
 
@@ -89,13 +92,13 @@ export default function NewInventoryItemScreen({ navigation, route }: any) {
         // Only show IMEI-tracked products
         setProducts(result.data.filter(p => p.productModelId && p.isActive !== false));
       }
-    } catch (error) {
-      console.error('Failed to load products:', error);
+    } catch (error: unknown) {
+
       hasLoadedProducts.current = false; // Reset on error so it can retry
     }
   }, []);
 
-  const loadItem = async () => {
+  const loadItem = useCallback(async () => {
     if (!itemId) return;
     try {
       setLoadingItem(true);
@@ -115,14 +118,24 @@ export default function NewInventoryItemScreen({ navigation, route }: any) {
       setPurchaseCost(item.purchaseCost?.toString() || '');
       setIsPriceInherited(false); // Don't mark as inherited when loading existing item
       setNotes(item.notes || '');
-    } catch (error: any) {
-      console.error('Failed to load item:', error);
+    } catch (error: unknown) {
+
       Alert.alert('Error', 'Failed to load item data');
       navigation.goBack();
     } finally {
       setLoadingItem(false);
     }
-  };
+  }, [itemId, navigation]);
+
+  useEffect(() => {
+    const initialize = async () => {
+      await loadProducts();
+      if (isEditMode && itemId) {
+        await loadItem();
+      }
+    };
+    void initialize();
+  }, [isEditMode, itemId, loadItem, loadProducts]);
 
   const normalizeIMEI = (imei: string): string => {
     return imei.replace(/[\s-]/g, '').toUpperCase();
@@ -173,7 +186,14 @@ export default function NewInventoryItemScreen({ navigation, route }: any) {
     try {
       if (isEditMode && itemId) {
         // For edit mode, only send changed fields
-        const updateData: any = {
+        const updateData: {
+          condition: 'new' | 'refurbished' | 'used';
+          simType?: 'physical' | 'esim' | null;
+          purchaseCost?: number;
+          notes?: string;
+          productId?: string;
+          imei?: string;
+        } = {
           condition,
           simType: simType || undefined,
           purchaseCost: purchaseCost.trim() ? parseFloat(purchaseCost) : undefined,
@@ -219,9 +239,11 @@ export default function NewInventoryItemScreen({ navigation, route }: any) {
           { text: 'OK', onPress: () => navigation.goBack() }
         ]);
       }
-    } catch (error: any) {
-      console.error('Error saving item:', error);
-      Alert.alert('Error', error.message || `Failed to ${isEditMode ? 'update' : 'create'} item`);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : `Failed to ${isEditMode ? 'update' : 'create'} item`;
+
+      Alert.alert('Error', errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -258,14 +280,16 @@ export default function NewInventoryItemScreen({ navigation, route }: any) {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           style={styles.content}
-          contentContainerStyle={styles.contentContainer}
+          contentContainerStyle={[styles.contentContainer, { paddingBottom: Math.max(insets.bottom + spacing.lg, spacing.xl) }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         >
           {/* Item Information */}
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>

@@ -18,7 +18,7 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -48,6 +48,7 @@ function formatNumber(value: number | undefined | null): string {
 
 export default function NewSwapScreen({ navigation, route }: any) {
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   
   const swapId = route?.params?.swapId;
@@ -122,7 +123,6 @@ export default function NewSwapScreen({ navigation, route }: any) {
       if (productsRes.data) setProducts(productsRes.data);
       if (modelsRes.data) setProductModels(modelsRes.data);
     } catch (error: any) {
-      console.error('Error loading initial data:', error);
     } finally {
       setLoading(false);
     }
@@ -203,7 +203,6 @@ export default function NewSwapScreen({ navigation, route }: any) {
       setPaymentMethod(swap.paymentMethod as typeof paymentMethod);
       setNotes(swap.notes || '');
     } catch (error: any) {
-      console.error('Error loading swap:', error);
       Alert.alert('Error', 'Failed to load swap data');
       navigation.goBack();
     } finally {
@@ -235,11 +234,21 @@ export default function NewSwapScreen({ navigation, route }: any) {
     
     // If an inventory item is selected, use its pricing
     if (selectedPurchaseInventoryItem) {
-      // Priority: IMEI-specific selling price > SIM type price > product price
+      // Priority: IMEI-specific selling price > Condition-based price > SIM type price > product price
       if (selectedPurchaseInventoryItem.sellingPrice !== null && 
           selectedPurchaseInventoryItem.sellingPrice !== undefined && 
           selectedPurchaseInventoryItem.sellingPrice > 0) {
         return selectedPurchaseInventoryItem.sellingPrice;
+      } else if (selectedPurchaseInventoryItem.condition === 'new' && 
+                 selectedProduct.newPrice !== null && 
+                 selectedProduct.newPrice !== undefined && 
+                 selectedProduct.newPrice > 0) {
+        return selectedProduct.newPrice;
+      } else if (selectedPurchaseInventoryItem.condition === 'used' && 
+                 selectedProduct.usedPrice !== null && 
+                 selectedProduct.usedPrice !== undefined && 
+                 selectedProduct.usedPrice > 0) {
+        return selectedProduct.usedPrice;
       } else if (selectedPurchaseInventoryItem.simType === 'physical' && 
                  selectedProduct.physicalSimPrice !== null && 
                  selectedProduct.physicalSimPrice !== undefined) {
@@ -305,7 +314,6 @@ export default function NewSwapScreen({ navigation, route }: any) {
         Alert.alert('Success', 'Customer created successfully');
       }
     } catch (error: any) {
-      console.error('Error creating customer:', error);
       Alert.alert('Error', 'Failed to create customer');
     } finally {
       setSubmitting(false);
@@ -429,7 +437,6 @@ export default function NewSwapScreen({ navigation, route }: any) {
                   customerId: selectedCustomerId || null,
                   soldDate: new Date().toISOString(),
                 });
-                console.log(`Marked inventory item ${selectedPurchaseInventoryItemId} as sold for swap`);
               } else if (manualPurchaseImei.trim()) {
                 // Manual IMEI entry - try to find and mark it
                 const imeiResult = await InventoryItemService.getInventoryItemByImei(manualPurchaseImei.trim());
@@ -441,7 +448,6 @@ export default function NewSwapScreen({ navigation, route }: any) {
                     customerId: selectedCustomerId || null,
                     soldDate: new Date().toISOString(),
                   });
-                  console.log(`Marked inventory item ${imeiResult.data.id} as sold for swap`);
                   
                   // Update swap record with the found inventory item ID
                   await SwapService.updateSwap(result.data.id, {
@@ -455,10 +461,8 @@ export default function NewSwapScreen({ navigation, route }: any) {
               await DatabaseService.updateProduct(selectedProductId, {
                 stock: newStock,
               });
-              console.log(`Decreased stock for product ${selectedProduct.name} to ${newStock}`);
             }
           } catch (inventoryError: any) {
-            console.error('Error removing purchased product from inventory:', inventoryError);
             // Don't show error to user - swap is already created
             // Just log it for debugging
           }
@@ -519,7 +523,6 @@ export default function NewSwapScreen({ navigation, route }: any) {
               });
               
               if (newProductResult.error || !newProductResult.data) {
-                console.error('Error creating trade-in product:', newProductResult.error);
                 Alert.alert('Warning', `Swap created but failed to add inventory: ${newProductResult.error?.message || 'Unknown error'}`);
                 // Continue anyway - swap is already created
               } else {
@@ -540,7 +543,6 @@ export default function NewSwapScreen({ navigation, route }: any) {
               if (existingImeiCheck.data) {
                 // IMEI already exists - show warning to user
                 Alert.alert('Warning', `IMEI ${tradeInImei.trim()} already exists in inventory. Inventory item not created.`);
-                console.warn(`IMEI ${tradeInImei.trim()} already exists in inventory`);
               } else {
                 // Determine selling price: use IMEI-specific price if set, otherwise null (will use product/SIM price)
                 const sellingPrice = tradeInSellingPrice.trim() 
@@ -558,23 +560,18 @@ export default function NewSwapScreen({ navigation, route }: any) {
                 });
                 
                 if (inventoryItemResult.error) {
-                  console.error('Error creating inventory item for trade-in:', inventoryItemResult.error);
                   Alert.alert('Warning', `Swap created but failed to add inventory item: ${inventoryItemResult.error?.message || 'Unknown error'}`);
                   // Continue anyway - swap is already created
                 } else if (inventoryItemResult.data) {
-                  console.log('Successfully created inventory item:', inventoryItemResult.data.id);
                 }
               }
             } else {
               if (!finalTradeInProductId) {
-                console.warn('Cannot create inventory item: product not found or not created');
               }
               if (!tradeInImei.trim()) {
-                console.warn('Cannot create inventory item: IMEI not provided');
               }
             }
           } catch (inventoryError: any) {
-            console.error('Error adding trade-in device to inventory:', inventoryError);
             // Don't show error to user - swap is already created successfully
             // Just log it for debugging
           }
@@ -588,7 +585,6 @@ export default function NewSwapScreen({ navigation, route }: any) {
         }
       }
     } catch (error: any) {
-      console.error('Error creating swap:', error);
       Alert.alert('Error', error.message || 'Failed to create swap');
     } finally {
       setSubmitting(false);
@@ -653,15 +649,16 @@ export default function NewSwapScreen({ navigation, route }: any) {
         />
         
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + spacing.lg, spacing.xl) }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         >
           {/* Customer Section */}
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -1086,7 +1083,6 @@ export default function NewSwapScreen({ navigation, route }: any) {
                 setPurchaseInventoryItems([]);
               }
             } catch (error) {
-              console.error('Error loading inventory items for swap purchase:', error);
               setPurchaseInventoryItems([]);
               Alert.alert('Error', 'Failed to load available devices for this product');
             } finally {

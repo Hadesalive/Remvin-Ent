@@ -87,7 +87,7 @@ export default function DebtDetailScreen({ navigation, route }: any) {
         }
       }
     } catch (error: any) {
-      console.error('Failed to load debt:', error);
+
       Alert.alert('Error', 'Failed to load debt');
       navigation.goBack();
     } finally {
@@ -124,7 +124,7 @@ export default function DebtDetailScreen({ navigation, route }: any) {
       setPaymentMethod('cash');
       Alert.alert('Success', 'Payment recorded successfully');
     } catch (error: any) {
-      console.error('Failed to add payment:', error);
+
       Alert.alert('Error', error.message || 'Failed to record payment');
     } finally {
       setAddingPayment(false);
@@ -156,7 +156,7 @@ export default function DebtDetailScreen({ navigation, route }: any) {
                 },
               ]);
             } catch (error: any) {
-              console.error('Failed to delete debt:', error);
+
               Alert.alert('Error', 'Failed to delete debt. Please try again.');
             } finally {
               setDeleting(false);

@@ -58,7 +58,11 @@ export default function DebtListScreen({ navigation }: any) {
 
   useEffect(() => {
     loadData();
-  }, []);
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadData();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const loadData = async () => {
     try {
@@ -72,7 +76,7 @@ export default function DebtListScreen({ navigation }: any) {
         setCustomers(customersRes.data);
       }
     } catch (error: any) {
-      console.error('Failed to load data:', error);
+
     } finally {
       setLoading(false);
     }

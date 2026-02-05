@@ -50,7 +50,6 @@ export const SwapService = {
 
       return { data: swaps, error: null };
     } catch (error: any) {
-      console.error('Error fetching swaps:', error);
       return { data: null, error };
     }
   },
@@ -101,7 +100,6 @@ export const SwapService = {
         error: null,
       };
     } catch (error: any) {
-      console.error('Error fetching swap:', error);
       return { data: null, error };
     }
   },
@@ -183,7 +181,6 @@ export const SwapService = {
         error: null,
       };
     } catch (error: any) {
-      console.error('Error creating swap:', error);
       return { data: null, error };
     }
   },
@@ -245,7 +242,6 @@ export const SwapService = {
         error: null,
       };
     } catch (error: any) {
-      console.error('Error updating swap:', error);
       return { data: null, error };
     }
   },
@@ -296,9 +292,7 @@ export const SwapService = {
                     soldDate: null,
                     customerId: null,
                   });
-                  console.log(`Restored inventory item ${inventoryItemIdToRestore} to in_stock`);
                 } catch (inventoryError) {
-                  console.error(`Error restoring inventory item ${inventoryItemIdToRestore}:`, inventoryError);
                 }
               }
             } else {
@@ -307,11 +301,9 @@ export const SwapService = {
               await DatabaseService.updateProduct(swap.purchasedProductId, {
                 stock: newStock,
               });
-              console.log(`Restored stock for product ${purchasedProduct.name} to ${newStock}`);
             }
           }
         } catch (restoreError) {
-          console.error('Error restoring purchased product inventory:', restoreError);
           // Continue with deletion even if restoration fails
         }
 
@@ -326,11 +318,9 @@ export const SwapService = {
               if (notes.includes(`Swap #${swap.swapNumber}`) || notes.includes('Trade-in from swap')) {
                 // Delete the inventory item
                 await InventoryItemService.deleteInventoryItem(imeiResult.data.id);
-                console.log(`Deleted trade-in inventory item ${imeiResult.data.id} for swap ${swap.swapNumber}`);
               }
             }
           } catch (tradeInError) {
-            console.error('Error removing trade-in inventory item:', tradeInError);
             // Continue with deletion even if trade-in removal fails
           }
         }
@@ -346,7 +336,6 @@ export const SwapService = {
 
       return { data: true, error: null };
     } catch (error: any) {
-      console.error('Error deleting swap:', error);
       return { data: false, error };
     }
   },
@@ -398,7 +387,6 @@ export const SwapService = {
 
       return { data: swaps, error: null };
     } catch (error: any) {
-      console.error('Error searching swaps:', error);
       return { data: null, error };
     }
   },

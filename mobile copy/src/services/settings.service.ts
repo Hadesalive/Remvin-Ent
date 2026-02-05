@@ -89,7 +89,6 @@ export const SettingsService = {
         companySettings: defaultCompanySettings,
       };
     } catch (error) {
-      console.error('Error loading settings:', error);
       return {
         preferences: defaultPreferences,
         companySettings: defaultCompanySettings,
@@ -104,7 +103,6 @@ export const SettingsService = {
     try {
       await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     } catch (error) {
-      console.error('Error saving settings:', error);
       throw error;
     }
   },

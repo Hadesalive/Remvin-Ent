@@ -38,7 +38,6 @@ export const DebtService = {
         createdAt: debt.created_at,
       }));
     } catch (error) {
-      console.error('Error fetching debts:', error);
       throw error;
     }
   },
@@ -70,7 +69,6 @@ export const DebtService = {
         createdAt: data.created_at,
       };
     } catch (error) {
-      console.error('Error fetching debt:', error);
       throw error;
     }
   },
@@ -97,7 +95,6 @@ export const DebtService = {
         method: payment.method || null,
       }));
     } catch (error) {
-      console.error('Error fetching debt payments:', error);
       throw error;
     }
   },
@@ -146,7 +143,6 @@ export const DebtService = {
         createdAt: data.created_at,
       };
     } catch (error) {
-      console.error('Error creating debt:', error);
       throw error;
     }
   },
@@ -222,7 +218,6 @@ export const DebtService = {
         },
       };
     } catch (error) {
-      console.error('Error adding debt payment:', error);
       throw error;
     }
   },
@@ -239,7 +234,6 @@ export const DebtService = {
 
       if (error) throw error;
     } catch (error) {
-      console.error('Error deleting debt:', error);
       throw error;
     }
   },

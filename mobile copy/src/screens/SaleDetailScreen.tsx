@@ -31,19 +31,15 @@ import { Header } from '../components/ui/Header';
 function parseSaleItems(items: string): SaleItem[] {
   try {
     if (!items) {
-      console.log('[parseSaleItems] No items provided');
       return [];
     }
     const parsed = typeof items === 'string' ? JSON.parse(items) : items;
-    console.log('[parseSaleItems] Raw parsed items:', JSON.stringify(parsed, null, 2));
     if (!Array.isArray(parsed)) {
-      console.log('[parseSaleItems] Items is not an array:', typeof parsed);
       return [];
     }
     // Ensure all numeric fields are properly set
     // Handle both mobile format (camelCase) and desktop format (snake_case)
     const mappedItems = parsed.map((item: any, index: number) => {
-      console.log(`[parseSaleItems] Item ${index}:`, JSON.stringify(item, null, 2));
       const result = {
         id: item.id || '',
         // Handle both camelCase (productId) and snake_case (product_id)
@@ -60,14 +56,10 @@ function parseSaleItems(items: string): SaleItem[] {
         imeis: item.imeis || undefined,
         inventoryItemIds: item.inventoryItemIds || item.inventory_item_ids || undefined,
       };
-      console.log(`[parseSaleItems] Mapped item ${index}:`, JSON.stringify(result, null, 2));
       return result;
     });
-    console.log('[parseSaleItems] Final mapped items:', JSON.stringify(mappedItems, null, 2));
     return mappedItems;
-  } catch (error: any) {
-    console.error('[parseSaleItems] Error parsing items:', error);
-    console.log('[parseSaleItems] Items value that caused error:', items);
+  } catch {
     return [];
   }
 }
@@ -114,15 +106,11 @@ export default function SaleDetailScreen({ navigation, route }: any) {
             setCustomer(customerResult.data);
           }
         } catch (error: any) {
-          console.error('Failed to load customer:', error);
         }
       }
 
       // Parse items and fetch product details
-      console.log('[loadSale] Raw saleData.items:', saleData.items);
-      console.log('[loadSale] saleData.items type:', typeof saleData.items);
       let items = parseSaleItems(saleData.items);
-      console.log('[loadSale] Parsed items after parseSaleItems:', JSON.stringify(items, null, 2));
       
       const productMap = new Map<string, Product>();
       const inventoryItemIds: string[] = [];
@@ -130,7 +118,6 @@ export default function SaleDetailScreen({ navigation, route }: any) {
       // Collect all inventory item IDs and product IDs, and fetch product names
       const updatedItems = await Promise.all(
         items.map(async (item, index) => {
-          console.log(`[loadSale] Processing item ${index}:`, JSON.stringify(item, null, 2));
           
           if (item.inventoryItemIds && Array.isArray(item.inventoryItemIds)) {
             inventoryItemIds.push(...item.inventoryItemIds);
@@ -138,26 +125,21 @@ export default function SaleDetailScreen({ navigation, route }: any) {
           
           // If productName is missing, try to fetch it from the product
           if ((!item.productName || item.productName.trim() === '') && item.productId) {
-            console.log(`[loadSale] Item ${index} missing productName, fetching product ${item.productId}`);
             try {
               const productResult = await DatabaseService.getProductById(item.productId);
               if (productResult.data) {
-                console.log(`[loadSale] Product ${item.productId} found:`, productResult.data.name);
                 productMap.set(item.productId, productResult.data);
                 // Update the item with the product name
                 item.productName = productResult.data.name;
               } else {
-                console.log(`[loadSale] Product ${item.productId} not found in database`);
                 // Product not found, use fallback
                 item.productName = `Product ${item.productId.substring(0, 8)}`;
               }
             } catch (error: any) {
-              console.error(`[loadSale] Failed to load product ${item.productId}:`, error);
               // If we can't load the product and productName is still empty, use a fallback
               item.productName = `Product ${item.productId.substring(0, 8)}`;
             }
           } else if (item.productId) {
-            console.log(`[loadSale] Item ${index} has productName: "${item.productName}", still fetching product for metadata`);
             // ProductName exists, but still fetch product for metadata
             try {
               const productResult = await DatabaseService.getProductById(item.productId);
@@ -165,27 +147,22 @@ export default function SaleDetailScreen({ navigation, route }: any) {
                 productMap.set(item.productId, productResult.data);
               }
             } catch (error: any) {
-              console.error(`[loadSale] Failed to load product ${item.productId}:`, error);
             }
           } else {
-            console.log(`[loadSale] Item ${index} has no productId`);
           }
           
           if (!item.productName || item.productName.trim() === '') {
-            console.log(`[loadSale] Item ${index} still has no productName after processing, using fallback`);
             // Still no productName - use a generic fallback
             item.productName = item.productId 
               ? `Product ${item.productId.substring(0, 8)}` 
               : 'Unknown Product';
           }
           
-          console.log(`[loadSale] Final item ${index}:`, JSON.stringify(item, null, 2));
           return item;
         })
       );
       
       items = updatedItems;
-      console.log('[loadSale] Final items array:', JSON.stringify(items, null, 2));
 
       setProducts(productMap);
 
@@ -200,14 +177,12 @@ export default function SaleDetailScreen({ navigation, route }: any) {
                 inventoryMap.set(id, result.data);
               }
             } catch (error: any) {
-              console.error(`Failed to load inventory item ${id}:`, error);
             }
           })
         );
         setInventoryItems(inventoryMap);
       }
     } catch (error: any) {
-      console.error('Failed to load sale:', error);
       Alert.alert('Error', 'Failed to load sale details. Please try again.');
       navigation.goBack();
     } finally {
@@ -246,7 +221,6 @@ export default function SaleDetailScreen({ navigation, route }: any) {
                 },
               ]);
             } catch (error: any) {
-              console.error('Failed to delete sale:', error);
               Alert.alert('Error', 'Failed to delete sale. Please try again.');
             } finally {
               setDeleting(false);

@@ -17,7 +17,7 @@ import {
   Platform,
   Switch,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { DatabaseService } from '../services/database.service';
@@ -26,6 +26,7 @@ import { spacing, fontSize, fontWeight } from '../lib/theme';
 
 export default function NewCustomerScreen({ navigation, route }: any) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const customerId = route?.params?.customerId;
   const isEditMode = !!customerId;
 
@@ -74,7 +75,7 @@ export default function NewCustomerScreen({ navigation, route }: any) {
       setNotes(data.notes || '');
       setIsActive(data.isActive !== false);
     } catch (error: any) {
-      console.error('Failed to load customer:', error);
+
       Alert.alert('Error', 'Failed to load customer data');
       navigation.goBack();
     } finally {
@@ -136,7 +137,7 @@ export default function NewCustomerScreen({ navigation, route }: any) {
         ]);
       }
     } catch (error: any) {
-      console.error('Error saving customer:', error);
+
       Alert.alert('Error', error.message || `Failed to ${isEditMode ? 'update' : 'create'} customer`);
     } finally {
       setSubmitting(false);
@@ -173,10 +174,16 @@ export default function NewCustomerScreen({ navigation, route }: any) {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardAvoidingView}
+        keyboardVerticalOffset={0}
       >
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + spacing.lg, spacing.xl) }]} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+        >
           {/* Basic Information */}
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.cardHeader}>

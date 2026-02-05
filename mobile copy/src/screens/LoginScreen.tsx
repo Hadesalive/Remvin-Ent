@@ -15,16 +15,18 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { spacing, borderRadius, fontSize, fontWeight } from '../lib/theme';
+import logoIcon from '../../assets/icon.png';
 
 export default function LoginScreen() {
   const { login } = useAuth();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -43,8 +45,9 @@ export default function LoginScreen() {
         Alert.alert('Login Failed', result.error || 'Invalid credentials');
       }
       // Navigation handled by App.tsx based on auth state
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'An unexpected error occurred');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'An unexpected error occurred';
+      Alert.alert('Error', message);
     } finally {
       setLoading(false);
     }
@@ -53,12 +56,14 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + spacing.sm, spacing.md) }]}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         >
           <View style={styles.content}>
             {/* Logo & Header */}
@@ -72,7 +77,12 @@ export default function LoginScreen() {
                   },
                 ]}
               >
-                <Ionicons name="business" size={64} color={colors.accent} />
+                <Image
+                  source={logoIcon}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                  alt="Remvin Enterprise logo"
+                />
               </View>
               <Text style={[styles.title, { color: colors.foreground }]}>
                 Remvin Ent
@@ -194,6 +204,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.lg,
     borderWidth: 2,
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     fontSize: fontSize['3xl'],

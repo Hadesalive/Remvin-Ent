@@ -3,7 +3,7 @@
  * Manage IMEI-tracked inventory items (list, search, filter)
  */
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,13 @@ import { spacing, fontSize, fontWeight } from '../lib/theme';
 import { format } from 'date-fns';
 import { Header } from '../components/ui/Header';
 
+interface InventoryItemListScreenProps {
+  navigation: {
+    navigate: (screen: string, params?: { itemId?: string }) => void;
+    addListener: (type: string, callback: () => void) => () => void;
+  };
+}
+
 /**
  * Safely format a number
  */
@@ -40,7 +47,7 @@ function formatNumber(value: number | undefined | null): string {
   }
 }
 
-export default function InventoryItemListScreen({ navigation }: any) {
+export default function InventoryItemListScreen({ navigation }: InventoryItemListScreenProps) {
   const { colors, isDark } = useTheme();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -53,7 +60,11 @@ export default function InventoryItemListScreen({ navigation }: any) {
 
   useEffect(() => {
     loadData();
-  }, []);
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadData();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const loadData = async () => {
     try {
@@ -69,8 +80,8 @@ export default function InventoryItemListScreen({ navigation }: any) {
       if (productsResult.data) {
         setProducts(productsResult.data);
       }
-    } catch (error: any) {
-      console.error('Failed to load data:', error);
+    } catch (error: unknown) {
+
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -153,32 +164,6 @@ export default function InventoryItemListScreen({ navigation }: any) {
       totalValue,
     };
   }, [items, productMap]);
-
-  const handleDelete = useCallback((item: InventoryItem) => {
-    Alert.alert(
-      'Delete Inventory Item',
-      `Are you sure you want to delete IMEI: ${item.imei}? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const result = await InventoryItemService.deleteInventoryItem(item.id);
-              if (result.error) {
-                Alert.alert('Error', result.error.message || 'Failed to delete item');
-              } else {
-                loadData();
-              }
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to delete item');
-            }
-          },
-        },
-      ]
-    );
-  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {

@@ -9,7 +9,7 @@ const SUPABASE_URL = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXP
 const SUPABASE_ANON_KEY = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.error('Missing Supabase configuration. Please check your .env file.');
+
 }
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {

@@ -1,6 +1,6 @@
 /**
  * Dashboard Screen
- * Remvin Enterprise LTD Mobile App
+ * Remvin Enterprise Mobile App
  * Design: Modern Card Layout
  */
 
@@ -50,10 +50,16 @@ const DEMO_DATA = {
   ]
 };
 
-export default function DashboardScreen({ navigation }: any) {
+interface DashboardScreenProps {
+  navigation: {
+    navigate: (screen: string, params?: { customerId?: string }) => void;
+  };
+}
+
+export default function DashboardScreen({ navigation }: DashboardScreenProps) {
   const { user } = useAuth();
   const { colors } = useTheme();
-  const { isTablet, isLargeTablet, width } = useResponsive();
+  const { width } = useResponsive();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +67,7 @@ export default function DashboardScreen({ navigation }: any) {
   
   // Responsive padding
   const padding = getResponsivePadding(width);
+  const isLargeTablet = width >= 900;
 
   // Memoize demo data to prevent recreation
   const demoData = useMemo(() => ({
@@ -84,24 +91,24 @@ export default function DashboardScreen({ navigation }: any) {
         try {
           const data = await DashboardService.getDashboardData();
           setDashboardData(data);
-        } catch (err: any) {
-          console.error('Failed to load dashboard:', err);
-          setError(err.message || 'Failed to load dashboard data');
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Failed to load dashboard data';
+          setError(message);
           // Fallback to demo data on error if no data exists
           if (!dashboardData) {
-            setDashboardData(demoData as any);
+            setDashboardData(demoData as DashboardData);
           }
         } finally {
           setLoading(false);
           setRefreshing(false);
         }
       });
-    } catch (err: any) {
-      console.error('Failed to load dashboard:', err);
-      setError(err.message || 'Failed to load dashboard data');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to load dashboard data';
+      setError(message);
       // Fallback to demo data on error if no data exists
       if (!dashboardData) {
-        setDashboardData(demoData as any);
+        setDashboardData(demoData as DashboardData);
       }
       setLoading(false);
       setRefreshing(false);

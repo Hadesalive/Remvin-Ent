@@ -17,7 +17,7 @@ import {
   Platform,
   Switch,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { ProductModelService } from '../services/product-model.service';
@@ -31,6 +31,7 @@ const CATEGORIES = ['Smartphones', 'Tablets', 'Accessories', 'Other'];
 
 export default function NewProductModelScreen({ navigation, route }: any) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const modelId = route?.params?.modelId;
   const isEditMode = !!modelId;
 
@@ -74,7 +75,6 @@ export default function NewProductModelScreen({ navigation, route }: any) {
         setExistingCategories([...new Set([...CATEGORIES, ...cats])]);
       }
     } catch (error) {
-      console.error('Failed to load categories:', error);
     }
   }, []);
 
@@ -109,7 +109,6 @@ export default function NewProductModelScreen({ navigation, route }: any) {
       );
       setIsActive(model.isActive !== false);
     } catch (error: any) {
-      console.error('Failed to load model:', error);
       Alert.alert('Error', 'Failed to load model data');
       navigation.goBack();
     } finally {
@@ -183,7 +182,6 @@ export default function NewProductModelScreen({ navigation, route }: any) {
         ]);
       }
     } catch (error: any) {
-      console.error('Error saving model:', error);
       Alert.alert('Error', error.message || `Failed to ${isEditMode ? 'update' : 'create'} model`);
     } finally {
       setSubmitting(false);
@@ -221,14 +219,16 @@ export default function NewProductModelScreen({ navigation, route }: any) {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           style={styles.content}
-          contentContainerStyle={styles.contentContainer}
+          contentContainerStyle={[styles.contentContainer, { paddingBottom: Math.max(insets.bottom + spacing.lg, spacing.xl) }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         >
           {/* Model Information */}
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -336,7 +336,7 @@ export default function NewProductModelScreen({ navigation, route }: any) {
           {/* Storage Options */}
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
-              <Ionicons name="hard-drive-outline" size={20} color={colors.accent} />
+              <Ionicons name="server-outline" size={20} color={colors.accent} />
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Storage Options</Text>
             </View>
 

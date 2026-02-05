@@ -61,7 +61,7 @@ export default function SwapDetailScreen({ navigation, route }: any) {
       const result = await SwapService.getSwapById(swapId);
       
       if (result.error) {
-        console.error('Error loading swap:', result.error);
+
         Alert.alert('Error', 'Failed to load swap details');
       } else if (result.data) {
         setSwap(result.data);
@@ -70,7 +70,7 @@ export default function SwapDetailScreen({ navigation, route }: any) {
         navigation.goBack();
       }
     } catch (error: any) {
-      console.error('Error loading swap:', error);
+
       Alert.alert('Error', 'Failed to load swap details');
     } finally {
       setLoading(false);
@@ -101,7 +101,7 @@ export default function SwapDetailScreen({ navigation, route }: any) {
                 ]);
               }
             } catch (error: any) {
-              console.error('Error deleting swap:', error);
+
               Alert.alert('Error', 'Failed to delete swap');
             } finally {
               setDeleting(false);

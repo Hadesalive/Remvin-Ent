@@ -98,13 +98,13 @@ export default function SwapsListScreen({ navigation }: any) {
       }
       const result = await SwapService.getSwaps();
       if (result.error) {
-        console.error('Failed to load swaps:', result.error);
+
       } else {
         setAllSwaps(result.data || []);
         setCurrentPage(1); // Reset to first page
       }
     } catch (error: any) {
-      console.error('Failed to load swaps:', error);
+
     } finally {
       setLoading(false);
       setRefreshing(false);

@@ -80,7 +80,6 @@ export const DashboardService = {
         weeklySales,
       };
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
       throw error;
     }
   },

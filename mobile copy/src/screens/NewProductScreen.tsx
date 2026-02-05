@@ -16,17 +16,30 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { DatabaseService } from '../services/database.service';
 import { ProductModelService } from '../services/product-model.service';
-import { Product, ProductModel } from '../types';
+import { ProductModel } from '../types';
 import { spacing, fontSize, fontWeight } from '../lib/theme';
 import { SelectionModal } from '../components/ui/SelectionModal';
 
-export default function NewProductScreen({ navigation, route }: any) {
-  const { colors, isDark } = useTheme();
+interface NewProductScreenProps {
+  navigation: {
+    goBack: () => void;
+    navigate: (screen: string, params?: { productId?: string }) => void;
+  };
+  route: {
+    params?: {
+      productId?: string;
+    };
+  };
+}
+
+export default function NewProductScreen({ navigation, route }: NewProductScreenProps) {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const productId = route?.params?.productId;
   const isEditMode = !!productId;
 
@@ -43,8 +56,6 @@ export default function NewProductScreen({ navigation, route }: any) {
   const [color, setColor] = useState('');
   const [productModels, setProductModels] = useState<ProductModel[]>([]);
   const [selectedModel, setSelectedModel] = useState<ProductModel | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showModelModal, setShowModelModal] = useState(false);
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showColorModal, setShowColorModal] = useState(false);
@@ -52,7 +63,8 @@ export default function NewProductScreen({ navigation, route }: any) {
   const [supportsEsim, setSupportsEsim] = useState(false);
   const [physicalSimPrice, setPhysicalSimPrice] = useState('');
   const [eSimPrice, setEsimPrice] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [newPrice, setNewPrice] = useState('');
+  const [usedPrice, setUsedPrice] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [loadingProduct, setLoadingProduct] = useState(false);
   const hasLoadedInitialData = useRef(false);
@@ -69,20 +81,9 @@ export default function NewProductScreen({ navigation, route }: any) {
         setProductModels(modelsResult.data.filter(m => m.isActive !== false));
       }
 
-      // Load existing categories
-      const productsResult = await DatabaseService.getProducts();
-      if (productsResult.data) {
-        const uniqueCategories = Array.from(
-          new Set(
-            productsResult.data
-              .map(p => p.category)
-              .filter((cat): cat is string => Boolean(cat?.trim()))
-          )
-        ).sort();
-        setCategories(uniqueCategories);
-      }
-    } catch (error) {
-      console.error('Failed to load initial data:', error);
+      // Load existing categories (for future use if needed)
+      await DatabaseService.getProducts();
+    } catch {
       hasLoadedInitialData.current = false; // Reset on error so it can retry
     }
   }, []);
@@ -93,39 +94,7 @@ export default function NewProductScreen({ navigation, route }: any) {
   }, [loadInitialData]);
 
   // Load product data when editing
-  useEffect(() => {
-    if (isEditMode && productId) {
-      loadProduct();
-    }
-  }, [productId, isEditMode]);
-
-  // Update selected model when productModelId changes
-  useEffect(() => {
-    const model = productModels.find(m => m.id === productModelId) || null;
-    setSelectedModel(model);
-    // Clear storage/color if model doesn't have those options
-    if (model) {
-      if (model.storageOptions && model.storageOptions.length > 0 && !model.storageOptions.includes(storage)) {
-        setStorage('');
-      }
-      if (model.colors && model.colors.length > 0 && !model.colors.includes(color)) {
-        setColor('');
-      }
-    }
-  }, [productModelId, productModels]);
-
-  // Auto-generate product name from model + storage + color
-  useEffect(() => {
-    if (selectedModel && storage && color) {
-      setName(`${selectedModel.name} ${storage} ${color}`);
-    } else if (selectedModel && storage) {
-      setName(`${selectedModel.name} ${storage}`);
-    } else if (selectedModel) {
-      setName(selectedModel.name);
-    }
-  }, [selectedModel, storage, color]);
-
-  const loadProduct = async () => {
+  const loadProduct = useCallback(async () => {
     if (!productId) return;
 
     try {
@@ -162,14 +131,55 @@ export default function NewProductScreen({ navigation, route }: any) {
           ? String(product.eSimPrice)
           : ''
       );
-    } catch (error: any) {
-      console.error('Failed to load product:', error);
+      setNewPrice(
+        product.newPrice !== undefined && product.newPrice !== null
+          ? String(product.newPrice)
+          : ''
+      );
+      setUsedPrice(
+        product.usedPrice !== undefined && product.usedPrice !== null
+          ? String(product.usedPrice)
+          : ''
+      );
+    } catch {
       Alert.alert('Error', 'Failed to load product data');
       navigation.goBack();
     } finally {
       setLoadingProduct(false);
     }
-  };
+  }, [productId, navigation]);
+
+  useEffect(() => {
+    if (isEditMode && productId) {
+      loadProduct();
+    }
+  }, [productId, isEditMode, loadProduct]);
+
+  // Update selected model when productModelId changes
+  useEffect(() => {
+    const model = productModels.find(m => m.id === productModelId) || null;
+    setSelectedModel(model);
+    // Clear storage/color if model doesn't have those options
+    if (model) {
+      if (model.storageOptions && model.storageOptions.length > 0 && !model.storageOptions.includes(storage)) {
+        setStorage('');
+      }
+      if (model.colors && model.colors.length > 0 && !model.colors.includes(color)) {
+        setColor('');
+      }
+    }
+  }, [productModelId, productModels, storage, color]);
+
+  // Auto-generate product name from model + storage + color
+  useEffect(() => {
+    if (selectedModel && storage && color) {
+      setName(`${selectedModel.name} ${storage} ${color}`);
+    } else if (selectedModel && storage) {
+      setName(`${selectedModel.name} ${storage}`);
+    } else if (selectedModel) {
+      setName(selectedModel.name);
+    }
+  }, [selectedModel, storage, color]);
 
   const handleSubmit = async () => {
     // Validation
@@ -223,13 +233,16 @@ export default function NewProductScreen({ navigation, route }: any) {
         ? parseFloat(physicalSimPrice)
         : undefined,
       eSimPrice: eSimPrice.trim() ? parseFloat(eSimPrice) : undefined,
+      newPrice: productModelId && newPrice.trim() ? parseFloat(newPrice) : undefined,
+      usedPrice: productModelId && usedPrice.trim() ? parseFloat(usedPrice) : undefined,
       isActive: true,
     };
 
       if (isEditMode && productId) {
         const result = await DatabaseService.updateProduct(productId, productData);
         if (result.error) {
-          Alert.alert('Error', result.error.message || 'Failed to update product');
+          const apiError = result.error as { message?: string };
+          Alert.alert('Error', apiError.message || 'Failed to update product');
           return;
         }
         Alert.alert('Success', 'Product updated!', [
@@ -238,16 +251,17 @@ export default function NewProductScreen({ navigation, route }: any) {
       } else {
         const result = await DatabaseService.createProduct(productData);
         if (result.error) {
-          Alert.alert('Error', result.error.message || 'Failed to create product');
+          const apiError = result.error as { message?: string };
+          Alert.alert('Error', apiError.message || 'Failed to create product');
           return;
         }
         Alert.alert('Success', 'Product created!', [
           { text: 'OK', onPress: () => navigation.goBack() }
         ]);
       }
-    } catch (error: any) {
-      console.error('Error saving product:', error);
-      Alert.alert('Error', error.message || `Failed to ${isEditMode ? 'update' : 'create'} product`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : `Failed to ${isEditMode ? 'update' : 'create'} product`;
+      Alert.alert('Error', errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -287,14 +301,16 @@ export default function NewProductScreen({ navigation, route }: any) {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           style={styles.content}
-          contentContainerStyle={styles.contentContainer}
+          contentContainerStyle={[styles.contentContainer, { paddingBottom: Math.max(insets.bottom + spacing.lg, spacing.xl) }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         >
           {/* Product Details */}
           <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -485,6 +501,49 @@ export default function NewProductScreen({ navigation, route }: any) {
                 If set, inventory items with a SIM type can inherit these prices. Leaving blank uses the main selling price.
               </Text>
             </View>
+            
+            {/* Condition-based pricing for IMEI-tracked products */}
+            {productModelId && (
+              <View style={styles.inputGroup}>
+                <View style={styles.labelRow}>
+                  <Ionicons name="pricetag-outline" size={16} color={colors.accent} />
+                  <Text style={[styles.label, { color: colors.foreground, marginLeft: spacing.xs }]}>
+                    Condition-Based Pricing
+                  </Text>
+                </View>
+                <View style={styles.inputRow}>
+                  <View style={{ flex: 1, marginRight: spacing.sm }}>
+                    <Text style={[styles.label, { color: colors.mutedForeground, marginTop: spacing.sm }]}>
+                      New Condition Price (optional)
+                    </Text>
+                    <TextInput
+                      style={[styles.input, { backgroundColor: colors.input, color: colors.foreground, borderColor: colors.border }]}
+                      value={newPrice}
+                      onChangeText={setNewPrice}
+                      placeholder="0.00"
+                      placeholderTextColor={colors.mutedForeground}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.label, { color: colors.mutedForeground, marginTop: spacing.sm }]}>
+                      Used Condition Price (optional)
+                    </Text>
+                    <TextInput
+                      style={[styles.input, { backgroundColor: colors.input, color: colors.foreground, borderColor: colors.border }]}
+                      value={usedPrice}
+                      onChangeText={setUsedPrice}
+                      placeholder="0.00"
+                      placeholderTextColor={colors.mutedForeground}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                </View>
+                <Text style={[styles.helperText, { color: colors.mutedForeground }]}>
+                  Set different prices for new and used inventory items. If not set, the main selling price will be used.
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Stock & Inventory */}
@@ -664,6 +723,11 @@ const styles = StyleSheet.create({
   label: {
     fontSize: fontSize.sm,
     fontWeight: fontWeight.medium,
+    marginBottom: spacing.xs,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: spacing.xs,
   },
   input: {

@@ -1,10 +1,10 @@
 /**
  * Constants & Configuration
- * Remvin Enterprise LTD Mobile App
+ * Remvin Enterprise Mobile App
  */
 
 // App Information
-export const APP_NAME = 'Remvin Enterprise LTD';
+export const APP_NAME = 'Remvin Enterprise';
 export const APP_VERSION = '1.0.0';
 
 // Session Configuration

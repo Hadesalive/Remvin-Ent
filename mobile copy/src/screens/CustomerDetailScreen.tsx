@@ -3,7 +3,7 @@
  * Clean design matching SaleDetailScreen pattern
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -35,7 +35,19 @@ function formatNumber(value: number | undefined | null): string {
   return value.toLocaleString();
 }
 
-export default function CustomerDetailScreen({ navigation, route }: any) {
+interface CustomerDetailScreenProps {
+  navigation: {
+    goBack: () => void;
+    navigate: (screen: string, params?: { customerId?: string; saleId?: string }) => void;
+  };
+  route: {
+    params: {
+      customerId: string;
+    };
+  };
+}
+
+export default function CustomerDetailScreen({ navigation, route }: CustomerDetailScreenProps) {
   const { colors, isDark } = useTheme();
   const { customerId } = route.params;
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -49,32 +61,25 @@ export default function CustomerDetailScreen({ navigation, route }: any) {
   const [creditReason, setCreditReason] = useState('');
   const [addingCredit, setAddingCredit] = useState(false);
 
-  useEffect(() => {
-    loadCustomer();
-    loadCustomerSales();
-  }, [customerId]);
-
-  const loadCustomer = async () => {
+  const loadCustomer = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await DatabaseService.getCustomerById(customerId);
       if (error || !data) {
-        console.error('Error loading customer:', error);
         Alert.alert('Error', 'Customer not found');
         navigation.goBack();
         return;
       }
       setCustomer(data);
-    } catch (error: any) {
-      console.error('Failed to load customer:', error);
+    } catch (error: unknown) {
       Alert.alert('Error', 'Failed to load customer');
       navigation.goBack();
     } finally {
       setLoading(false);
     }
-  };
+  }, [customerId, navigation]);
 
-  const loadCustomerSales = async () => {
+  const loadCustomerSales = useCallback(async () => {
     try {
       setLoadingSales(true);
       const sales = await SalesService.getSales();
@@ -92,12 +97,16 @@ export default function CustomerDetailScreen({ navigation, route }: any) {
         : null;
 
       setStats({ totalOrders, totalSpent, lastOrderDate });
-    } catch (error: any) {
-      console.error('Failed to load customer sales:', error);
+    } catch (error: unknown) {
     } finally {
       setLoadingSales(false);
     }
-  };
+  }, [customerId]);
+
+  useEffect(() => {
+    void loadCustomer();
+    void loadCustomerSales();
+  }, [loadCustomer, loadCustomerSales]);
 
   const handleAddCredit = async () => {
     const amount = parseFloat(creditAmount);
@@ -127,8 +136,7 @@ export default function CustomerDetailScreen({ navigation, route }: any) {
       setCreditAmount('');
       setCreditReason('');
       Alert.alert('Success', `Added NLe ${formatNumber(amount)} credit. New balance: NLe ${formatNumber(newCredit)}`);
-    } catch (error: any) {
-      console.error('Failed to add credit:', error);
+    } catch (error: unknown) {
       Alert.alert('Error', 'Failed to add credit');
     } finally {
       setAddingCredit(false);
@@ -169,7 +177,6 @@ export default function CustomerDetailScreen({ navigation, route }: any) {
                 },
               ]);
             } catch (error: any) {
-              console.error('Failed to delete customer:', error);
               Alert.alert('Error', 'Failed to delete customer. Please try again.');
             } finally {
               setDeleting(false);
@@ -460,14 +467,6 @@ export default function CustomerDetailScreen({ navigation, route }: any) {
             </View>
           ) : (
             customerSales.map((sale, index) => {
-              let items: any[] = [];
-              try {
-                const parsed = typeof sale.items === 'string' ? JSON.parse(sale.items) : sale.items;
-                items = Array.isArray(parsed) ? parsed : [];
-              } catch (e) {
-                console.error('Error parsing sale items:', e);
-              }
-
               return (
                 <TouchableOpacity
                   key={sale.id}

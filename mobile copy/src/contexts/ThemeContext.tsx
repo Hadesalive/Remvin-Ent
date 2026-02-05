@@ -51,7 +51,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         setThemeMode(savedTheme as ThemeMode);
       }
     } catch (error) {
-      console.error('Error loading theme:', error);
+
     } finally {
       setIsLoading(false);
     }
@@ -61,7 +61,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     try {
       await AsyncStorage.setItem(THEME_STORAGE_KEY, mode);
     } catch (error) {
-      console.error('Error saving theme:', error);
+
     }
   };
 

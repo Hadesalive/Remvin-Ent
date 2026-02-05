@@ -82,6 +82,9 @@ export interface Product {
   supportsEsim?: boolean;
   physicalSimPrice?: number | null;
   eSimPrice?: number | null;
+  // Condition-based pricing for IMEI-tracked products
+  newPrice?: number | null; // Price for new condition items
+  usedPrice?: number | null; // Price for used condition items
   createdAt?: string;
   updatedAt?: string;
 }
@@ -306,6 +309,18 @@ export interface ApiResponse<T = any> {
   data?: T;
   error?: string;
   message?: string;
+}
+
+// Note/Journal
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  tags?: string | null; // JSON string or comma-separated
+  category?: string | null;
+  userId?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Dashboard Stats

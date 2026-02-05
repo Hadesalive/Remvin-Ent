@@ -31,7 +31,6 @@ export const ProductModelService = {
               const parsed = JSON.parse(model.colors);
               colors = Array.isArray(parsed) ? parsed : [];
             } catch (e) {
-              console.warn('Failed to parse colors JSON:', e);
             }
           }
         }
@@ -46,7 +45,6 @@ export const ProductModelService = {
               const parsed = JSON.parse(model.storage_options);
               storageOptions = Array.isArray(parsed) ? parsed : [];
             } catch (e) {
-              console.warn('Failed to parse storage_options JSON:', e);
             }
           }
         }
@@ -70,7 +68,6 @@ export const ProductModelService = {
 
         // Debug logging
         if (colors.length > 0 || storageOptions.length > 0) {
-          console.log(`[ProductModel] ${model.name}: ${storageOptions.length} storage options, ${colors.length} colors`);
         }
 
         return parsedModel;
@@ -78,7 +75,6 @@ export const ProductModelService = {
 
       return { data: models, error: null };
     } catch (error: any) {
-      console.error('Error fetching product models:', error);
       return { data: null, error };
     }
   },
@@ -116,7 +112,7 @@ export const ProductModelService = {
             const parsed = JSON.parse(data.colors);
             colors = Array.isArray(parsed) ? parsed : [];
           } catch (e) {
-            console.warn('Failed to parse colors JSON:', e);
+
           }
         }
       }
@@ -131,7 +127,7 @@ export const ProductModelService = {
             const parsed = JSON.parse(data.storage_options);
             storageOptions = Array.isArray(parsed) ? parsed : [];
           } catch (e) {
-            console.warn('Failed to parse storage_options JSON:', e);
+
           }
         }
       }
@@ -156,7 +152,6 @@ export const ProductModelService = {
         error: null,
       };
     } catch (error: any) {
-      console.error('Error fetching product model:', error);
       return { data: null, error };
     }
   },
@@ -202,7 +197,7 @@ export const ProductModelService = {
             const parsed = JSON.parse(data.colors);
             colors = Array.isArray(parsed) ? parsed : [];
           } catch (e) {
-            console.warn('Failed to parse colors JSON:', e);
+
           }
         }
       }
@@ -216,7 +211,7 @@ export const ProductModelService = {
             const parsed = JSON.parse(data.storage_options);
             storageOptions = Array.isArray(parsed) ? parsed : [];
           } catch (e) {
-            console.warn('Failed to parse storage_options JSON:', e);
+
           }
         }
       }
@@ -241,7 +236,6 @@ export const ProductModelService = {
         error: null,
       };
     } catch (error: any) {
-      console.error('Error creating product model:', error);
       return { data: null, error };
     }
   },
@@ -289,7 +283,7 @@ export const ProductModelService = {
             const parsed = JSON.parse(data.colors);
             colors = Array.isArray(parsed) ? parsed : [];
           } catch (e) {
-            console.warn('Failed to parse colors JSON:', e);
+
           }
         }
       }
@@ -303,7 +297,7 @@ export const ProductModelService = {
             const parsed = JSON.parse(data.storage_options);
             storageOptions = Array.isArray(parsed) ? parsed : [];
           } catch (e) {
-            console.warn('Failed to parse storage_options JSON:', e);
+
           }
         }
       }
@@ -328,7 +322,6 @@ export const ProductModelService = {
         error: null,
       };
     } catch (error: any) {
-      console.error('Error updating product model:', error);
       return { data: null, error };
     }
   },
@@ -347,7 +340,6 @@ export const ProductModelService = {
 
       return { data: true, error: null };
     } catch (error: any) {
-      console.error('Error deleting product model:', error);
       return { data: false, error };
     }
   },

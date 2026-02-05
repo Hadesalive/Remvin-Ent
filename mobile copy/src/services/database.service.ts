@@ -1,10 +1,59 @@
 import { supabase } from '../lib/supabase';
 import { Product, Customer } from '../types';
 import { InventoryItemService } from './inventory-item.service';
+import { CacheService } from './cache.service';
+
+// Helper function to process product data from database
+async function processProductData(p: Record<string, unknown>): Promise<Product> {
+    let stock = typeof p.stock === 'number' ? p.stock : 0;
+    
+    // If product has productModelId, calculate stock from inventory_items
+    if (p.product_model_id) {
+        const productId = typeof p.id === 'string' ? p.id : '';
+        const stockResult = await InventoryItemService.getInStockCount(productId);
+        if (stockResult.error) {
+            // Keep original stock value on error
+        } else {
+            stock = stockResult.data || 0;
+        }
+    }
+    
+    return {
+        id: p.id,
+        name: p.name,
+        description: p.description || undefined,
+        price: p.price,
+        cost: p.cost || undefined,
+        stock: stock,
+        minStock: p.min_stock || undefined,
+        sku: p.sku || undefined,
+        category: p.category || undefined,
+        image: p.image || undefined,
+        productModelId: p.product_model_id || undefined,
+        storage: p.storage || undefined,
+        color: p.color || undefined,
+        supportsPhysicalSim: p.supports_physical_sim ?? undefined,
+        supportsEsim: p.supports_esim ?? undefined,
+        physicalSimPrice: p.physical_sim_price ?? null,
+        eSimPrice: p.esim_price ?? null,
+        newPrice: p.new_price ?? null,
+        usedPrice: p.used_price ?? null,
+        isActive: p.is_active === 1 || p.is_active === true,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+    } as Product;
+}
 
 export const DatabaseService = {
     // Products
-    async getProducts() {
+    async getProducts(forceRefresh = false) {
+        // Check cache first (unless force refresh)
+        if (!forceRefresh) {
+            const cached = await CacheService.getCachedProducts();
+            if (cached) {
+                return { data: cached, error: null };
+            }
+        }
         const { data, error } = await supabase
             .from('products')
             .select('*')
@@ -14,49 +63,24 @@ export const DatabaseService = {
         if (error) return { data: null, error };
         
         // Process products and calculate stock for IMEI-tracked products
-        const products = await Promise.all((data || []).map(async (p: any) => {
-            let stock = p.stock || 0;
-            
-            // If product has productModelId, calculate stock from inventory_items
-            if (p.product_model_id) {
-                const stockResult = await InventoryItemService.getInStockCount(p.id);
-                if (stockResult.error) {
-                    console.error(`Error calculating stock for product ${p.id}:`, stockResult.error);
-                    // Keep original stock value on error
-                } else {
-                    stock = stockResult.data || 0;
-                }
-            }
-            
-            return {
-                id: p.id,
-                name: p.name,
-                description: p.description || undefined,
-                price: p.price,
-                cost: p.cost || undefined,
-                stock: stock,
-                minStock: p.min_stock || undefined,
-                sku: p.sku || undefined,
-                category: p.category || undefined,
-                image: p.image || undefined,
-                productModelId: p.product_model_id || undefined,
-                storage: p.storage || undefined,
-                color: p.color || undefined,
-                supportsPhysicalSim: p.supports_physical_sim ?? undefined,
-                supportsEsim: p.supports_esim ?? undefined,
-                physicalSimPrice: p.physical_sim_price ?? null,
-                eSimPrice: p.esim_price ?? null,
-                isActive: p.is_active === 1 || p.is_active === true,
-                createdAt: p.created_at,
-                updatedAt: p.updated_at,
-            } as Product;
-        }));
+        const products = await Promise.all((data || []).map(processProductData));
+        
+        // Cache the results
+        await CacheService.setCachedProducts(products);
         
         return { data: products, error: null };
     },
 
     async getProductById(id: string) {
         try {
+            // Try cache first
+            const cached = await CacheService.getCachedProducts();
+            if (cached) {
+                const cachedProduct = cached.find(p => p.id === id);
+                if (cachedProduct) {
+                    return { data: cachedProduct, error: null };
+                }
+            }
             const { data, error } = await supabase
                 .from('products')
                 .select('*')
@@ -67,46 +91,21 @@ export const DatabaseService = {
             if (error) return { data: null, error };
             if (!data) return { data: null, error: null };
 
-            let stock = data.stock || 0;
+            const product = await processProductData(data);
             
-            // If product has productModelId, calculate stock from inventory_items
-            if (data.product_model_id) {
-                const stockResult = await InventoryItemService.getInStockCount(id);
-                if (stockResult.error) {
-                    console.error(`Error calculating stock for product ${id}:`, stockResult.error);
-                    // Keep original stock value on error
+            // Update cache with this single product
+            if (cached) {
+                const index = cached.findIndex(p => p.id === id);
+                if (index >= 0) {
+                    cached[index] = product;
                 } else {
-                    stock = stockResult.data || 0;
+                    cached.push(product);
                 }
+                await CacheService.setCachedProducts(cached);
             }
             
-            return {
-                data: {
-                    id: data.id,
-                    name: data.name,
-                    description: data.description || undefined,
-                    price: data.price,
-                    cost: data.cost || undefined,
-                    stock: stock,
-                    minStock: data.min_stock || undefined,
-                    sku: data.sku || undefined,
-                    category: data.category || undefined,
-                    image: data.image || undefined,
-                    productModelId: data.product_model_id || undefined,
-                    storage: data.storage || undefined,
-                    color: data.color || undefined,
-                    supportsPhysicalSim: data.supports_physical_sim ?? undefined,
-                    supportsEsim: data.supports_esim ?? undefined,
-                    physicalSimPrice: data.physical_sim_price ?? null,
-                    eSimPrice: data.esim_price ?? null,
-                    isActive: data.is_active === 1 || data.is_active === true,
-                    createdAt: data.created_at,
-                    updatedAt: data.updated_at,
-                } as Product,
-                error: null,
-            };
-        } catch (error: any) {
-            console.error('Error fetching product by ID:', error);
+            return { data: product, error: null };
+        } catch (error: unknown) {
             return { data: null, error };
         }
     },
@@ -121,13 +120,44 @@ export const DatabaseService = {
     },
 
     // Customers
-    async getCustomers() {
+    async getCustomers(forceRefresh = false) {
+        // Check cache first (unless force refresh)
+        if (!forceRefresh) {
+            const cached = await CacheService.getCachedCustomers();
+            if (cached) {
+                return { data: cached, error: null };
+            }
+        }
         const { data, error } = await supabase
             .from('customers')
             .select('*')
             .is('deleted_at', null)
             .order('name');
-        return { data: data as Customer[], error };
+        
+        if (error) return { data: null, error };
+        
+        const customers = (data || []).map((c: Record<string, unknown>) => ({
+            id: c.id,
+            name: c.name,
+            email: c.email || undefined,
+            phone: c.phone || undefined,
+            address: c.address || undefined,
+            city: c.city || undefined,
+            state: c.state || undefined,
+            zip: c.zip || undefined,
+            country: c.country || undefined,
+            company: c.company || undefined,
+            notes: c.notes || undefined,
+            storeCredit: c.store_credit || 0,
+            isActive: c.is_active === 1 || c.is_active === true,
+            createdAt: c.created_at,
+            updatedAt: c.updated_at,
+        })) as Customer[];
+        
+        // Cache the results
+        await CacheService.setCachedCustomers(customers);
+        
+        return { data: customers, error: null };
     },
 
     async getCustomerById(id: string) {
@@ -187,35 +217,43 @@ export const DatabaseService = {
 
             if (error) throw error;
 
-            return {
-                data: {
-                    id: data.id,
-                    name: data.name,
-                    email: data.email || undefined,
-                    phone: data.phone || undefined,
-                    address: data.address || undefined,
-                    city: data.city || undefined,
-                    state: data.state || undefined,
-                    zip: data.zip || undefined,
-                    country: data.country || undefined,
-                    company: data.company || undefined,
-                    notes: data.notes || undefined,
-                    storeCredit: data.store_credit || 0,
-                    isActive: data.is_active === 1 || data.is_active === true,
-                    createdAt: data.created_at,
-                    updatedAt: data.updated_at,
-                } as Customer,
-                error: null,
-            };
-        } catch (error: any) {
-            console.error('Error creating customer:', error);
+            const newCustomer = {
+                id: data.id,
+                name: data.name,
+                email: data.email || undefined,
+                phone: data.phone || undefined,
+                address: data.address || undefined,
+                city: data.city || undefined,
+                state: data.state || undefined,
+                zip: data.zip || undefined,
+                country: data.country || undefined,
+                company: data.company || undefined,
+                notes: data.notes || undefined,
+                storeCredit: data.store_credit || 0,
+                isActive: data.is_active === 1 || data.is_active === true,
+                createdAt: data.created_at,
+                updatedAt: data.updated_at,
+            } as Customer;
+            
+            // Update cache incrementally
+            const cached = await CacheService.getCachedCustomers();
+            if (cached) {
+                cached.push(newCustomer);
+                cached.sort((a, b) => a.name.localeCompare(b.name));
+                await CacheService.setCachedCustomers(cached);
+            } else {
+                await CacheService.invalidateCustomersCache();
+            }
+
+            return { data: newCustomer, error: null };
+        } catch (error: unknown) {
             return { data: null, error };
         }
     },
 
     async updateCustomer(id: string, updates: Partial<Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>>) {
         try {
-            const updateData: any = {
+            const updateData: Record<string, unknown> = {
                 updated_at: new Date().toISOString(),
             };
 
@@ -241,28 +279,42 @@ export const DatabaseService = {
 
             if (error) throw error;
 
-            return {
-                data: {
-                    id: data.id,
-                    name: data.name,
-                    email: data.email || undefined,
-                    phone: data.phone || undefined,
-                    address: data.address || undefined,
-                    city: data.city || undefined,
-                    state: data.state || undefined,
-                    zip: data.zip || undefined,
-                    country: data.country || undefined,
-                    company: data.company || undefined,
-                    notes: data.notes || undefined,
-                    storeCredit: data.store_credit || 0,
-                    isActive: data.is_active === 1 || data.is_active === true,
-                    createdAt: data.created_at,
-                    updatedAt: data.updated_at,
-                } as Customer,
-                error: null,
-            };
-        } catch (error: any) {
-            console.error('Error updating customer:', error);
+            const updatedCustomer = {
+                id: data.id,
+                name: data.name,
+                email: data.email || undefined,
+                phone: data.phone || undefined,
+                address: data.address || undefined,
+                city: data.city || undefined,
+                state: data.state || undefined,
+                zip: data.zip || undefined,
+                country: data.country || undefined,
+                company: data.company || undefined,
+                notes: data.notes || undefined,
+                storeCredit: data.store_credit || 0,
+                isActive: data.is_active === 1 || data.is_active === true,
+                createdAt: data.created_at,
+                updatedAt: data.updated_at,
+            } as Customer;
+            
+            // Update cache incrementally
+            const cached = await CacheService.getCachedCustomers();
+            if (cached) {
+                const index = cached.findIndex(c => c.id === id);
+                if (index >= 0) {
+                    cached[index] = updatedCustomer;
+                    await CacheService.setCachedCustomers(cached);
+                } else {
+                    cached.push(updatedCustomer);
+                    cached.sort((a, b) => a.name.localeCompare(b.name));
+                    await CacheService.setCachedCustomers(cached);
+                }
+            } else {
+                await CacheService.invalidateCustomersCache();
+            }
+
+            return { data: updatedCustomer, error: null };
+        } catch (error: unknown) {
             return { data: null, error };
         }
     },
@@ -276,9 +328,17 @@ export const DatabaseService = {
 
             if (error) throw error;
 
+            // Update cache incrementally - remove customer from cache
+            const cached = await CacheService.getCachedCustomers();
+            if (cached) {
+                const filtered = cached.filter(c => c.id !== id);
+                await CacheService.setCachedCustomers(filtered);
+            } else {
+                await CacheService.invalidateCustomersCache();
+            }
+
             return { data: true, error: null };
-        } catch (error: any) {
-            console.error('Error deleting customer:', error);
+        } catch (error: unknown) {
             return { data: null, error };
         }
     },
@@ -306,6 +366,8 @@ export const DatabaseService = {
                     supports_esim: productData.supportsEsim ?? null,
                     physical_sim_price: productData.physicalSimPrice ?? null,
                     esim_price: productData.eSimPrice ?? null,
+                    new_price: productData.newPrice ?? null,
+                    used_price: productData.usedPrice ?? null,
                     is_active: (productData.isActive !== false) ? 1 : 0,
                     created_at: now,
                     updated_at: now,
@@ -315,40 +377,29 @@ export const DatabaseService = {
 
             if (error) throw error;
 
-            return {
-                data: {
-                    id: data.id,
-                    name: data.name,
-                    description: data.description || undefined,
-                    price: data.price,
-                    cost: data.cost || undefined,
-                    stock: data.stock || 0,
-                    minStock: data.min_stock || undefined,
-                    sku: data.sku || undefined,
-                    category: data.category || undefined,
-                    image: data.image || undefined,
-                    productModelId: data.product_model_id || undefined,
-                    storage: data.storage || undefined,
-                    color: data.color || undefined,
-                    supportsPhysicalSim: data.supports_physical_sim ?? undefined,
-                    supportsEsim: data.supports_esim ?? undefined,
-                    physicalSimPrice: data.physical_sim_price ?? null,
-                    eSimPrice: data.esim_price ?? null,
-                    isActive: data.is_active === 1 || data.is_active === true,
-                    createdAt: data.created_at,
-                    updatedAt: data.updated_at,
-                } as Product,
-                error: null,
-            };
-        } catch (error: any) {
-            console.error('Error creating product:', error);
+            // Process the product data (calculate stock for IMEI-tracked products)
+            const newProduct = await processProductData(data);
+            
+            // Update cache incrementally - add new product to cache
+            const cached = await CacheService.getCachedProducts();
+            if (cached) {
+                cached.push(newProduct);
+                cached.sort((a, b) => a.name.localeCompare(b.name));
+                await CacheService.setCachedProducts(cached);
+            } else {
+                // If no cache, invalidate to force refresh on next getProducts call
+                await CacheService.invalidateProductsCache();
+            }
+
+            return { data: newProduct, error: null };
+        } catch (error: unknown) {
             return { data: null, error };
         }
     },
 
     async updateProduct(id: string, updates: Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt'>>) {
         try {
-            const updateData: any = {
+            const updateData: Record<string, unknown> = {
                 updated_at: new Date().toISOString(),
             };
 
@@ -368,6 +419,8 @@ export const DatabaseService = {
             if (updates.supportsEsim !== undefined) updateData.supports_esim = updates.supportsEsim ?? null;
             if (updates.physicalSimPrice !== undefined) updateData.physical_sim_price = updates.physicalSimPrice ?? null;
             if (updates.eSimPrice !== undefined) updateData.esim_price = updates.eSimPrice ?? null;
+            if (updates.newPrice !== undefined) updateData.new_price = updates.newPrice ?? null;
+            if (updates.usedPrice !== undefined) updateData.used_price = updates.usedPrice ?? null;
             if (updates.isActive !== undefined) updateData.is_active = updates.isActive ? 1 : 0;
 
             const { data, error } = await supabase
@@ -379,44 +432,49 @@ export const DatabaseService = {
 
             if (error) throw error;
 
-            return {
-                data: {
-                    id: data.id,
-                    name: data.name,
-                    description: data.description || undefined,
-                    price: data.price,
-                    cost: data.cost || undefined,
-                    stock: data.stock || 0,
-                    minStock: data.min_stock || undefined,
-                    sku: data.sku || undefined,
-                    category: data.category || undefined,
-                    image: data.image || undefined,
-                    productModelId: data.product_model_id || undefined,
-                    storage: data.storage || undefined,
-                    color: data.color || undefined,
-                    isActive: data.is_active === 1 || data.is_active === true,
-                    createdAt: data.created_at,
-                    updatedAt: data.updated_at,
-                } as Product,
-                error: null,
-            };
-        } catch (error: any) {
-            console.error('Error updating product:', error);
+            // Process the product data (calculate stock for IMEI-tracked products)
+            const updatedProduct = await processProductData(data);
+            
+            // Update cache incrementally - update product in cache
+            const cached = await CacheService.getCachedProducts();
+            if (cached) {
+                const index = cached.findIndex(p => p.id === id);
+                if (index >= 0) {
+                    cached[index] = updatedProduct;
+                    await CacheService.setCachedProducts(cached);
+                } else {
+                    // Product not in cache, add it
+                    cached.push(updatedProduct);
+                    cached.sort((a, b) => a.name.localeCompare(b.name));
+                    await CacheService.setCachedProducts(cached);
+                }
+            } else {
+                // If no cache, invalidate to force refresh on next getProducts call
+                await CacheService.invalidateProductsCache();
+            }
+
+            return { data: updatedProduct, error: null };
+        } catch (error: unknown) {
             return { data: null, error };
         }
     },
 
     async deleteProduct(id: string, options?: { forceDelete?: boolean }) {
         try {
-            // First, get the product to check if it has productModelId (IMEI tracking)
-            const productsResult = await this.getProducts();
-            if (productsResult.error || !productsResult.data) {
-                throw new Error('Failed to fetch product for deletion');
+            // Try to get product from cache first (no API call)
+            let product: Product | undefined;
+            const cached = await CacheService.getCachedProducts();
+            if (cached) {
+                product = cached.find(p => p.id === id);
             }
             
-            const product = productsResult.data.find(p => p.id === id);
+            // If not in cache, fetch just this one product (single record)
             if (!product) {
-                throw new Error('Product not found');
+                const productResult = await this.getProductById(id);
+                if (productResult.error || !productResult.data) {
+                    throw new Error('Failed to fetch product for deletion');
+                }
+                product = productResult.data;
             }
             
             // If product has IMEI tracking (productModelId), handle inventory items
@@ -436,7 +494,6 @@ export const DatabaseService = {
                     } else {
                         // Don't delete if there are inventory items (unless forceDelete)
                         // In Supabase, we'll allow deletion but log a warning
-                        console.warn(`Product ${id} has ${inventoryResult.data.length} inventory items. Consider using forceDelete option.`);
                     }
                 }
             }
@@ -449,15 +506,20 @@ export const DatabaseService = {
 
             if (error) throw error;
 
+            // Update cache incrementally - remove product from cache (no API call needed)
+            const cachedAfterDelete = await CacheService.getCachedProducts();
+            if (cachedAfterDelete) {
+                const filtered = cachedAfterDelete.filter(p => p.id !== id);
+                await CacheService.setCachedProducts(filtered);
+            } else {
+                // If no cache, invalidate to force refresh on next getProducts call
+                await CacheService.invalidateProductsCache();
+            }
+
             return { data: true, error: null };
-        } catch (error: any) {
-            console.error('Error deleting product:', error);
+        } catch (error: unknown) {
             return { data: null, error };
         }
     },
 
-    // Invoices (To be expanded)
-    async createInvoiceLineItem(invoiceId: string, item: any) {
-        // Placeholder for future logic if we save to DB directly
-    }
 };

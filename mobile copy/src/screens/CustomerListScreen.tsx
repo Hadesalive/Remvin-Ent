@@ -31,7 +31,14 @@ function formatNumber(value: number | undefined | null): string {
   return value.toLocaleString();
 }
 
-export default function CustomerListScreen({ navigation }: any) {
+interface CustomerListScreenProps {
+  navigation: {
+    navigate: (screen: string, params?: { customerId?: string }) => void;
+    addListener: (type: string, callback: () => void) => () => void;
+  };
+}
+
+export default function CustomerListScreen({ navigation }: CustomerListScreenProps) {
   const { colors, isDark } = useTheme();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,19 +48,21 @@ export default function CustomerListScreen({ navigation }: any) {
 
   useEffect(() => {
     loadCustomers();
-  }, []);
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadCustomers();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const loadCustomers = async () => {
     try {
       setLoading(true);
       const { data, error } = await DatabaseService.getCustomers();
       if (error) {
-        console.error('Error loading customers:', error);
       } else if (data) {
         setCustomers(data);
       }
-    } catch (error: any) {
-      console.error('Failed to load customers:', error);
+    } catch {
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -87,35 +96,29 @@ export default function CustomerListScreen({ navigation }: any) {
     return filtered;
   }, [customers, statusFilter, searchTerm]);
 
-  const metrics = useMemo(async () => {
-    const total = customers.length;
-    const active = customers.filter(c => c.isActive !== false).length;
-    
-    let totalRevenue = 0;
-    try {
-      const sales = await SalesService.getSales();
-      totalRevenue = sales.reduce((sum, sale) => {
-        if (sale.customerId) {
-          return sum + (sale.total || 0);
-        }
-        return sum;
-      }, 0);
-    } catch (error) {
-      console.error('Error calculating revenue:', error);
-    }
-
-    return { total, active, totalRevenue };
-  }, [customers]);
-
   const [metricsData, setMetricsData] = useState({ total: 0, active: 0, totalRevenue: 0 });
 
   useEffect(() => {
     const calculateMetrics = async () => {
-      const m = await metrics;
-      setMetricsData(m);
+      const total = customers.length;
+      const active = customers.filter(c => c.isActive !== false).length;
+      
+      let totalRevenue = 0;
+      try {
+        const sales = await SalesService.getSales();
+        totalRevenue = sales.reduce((sum, sale) => {
+          if (sale.customerId) {
+            return sum + (sale.total || 0);
+          }
+          return sum;
+        }, 0);
+      } catch {
+      }
+
+      setMetricsData({ total, active, totalRevenue });
     };
-    calculateMetrics();
-  }, [metrics]);
+    void calculateMetrics();
+  }, [customers]);
 
   const getInitials = (name: string) => {
     return name
@@ -238,7 +241,7 @@ export default function CustomerListScreen({ navigation }: any) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filtersScroll}
         >
-          {['all', 'active', 'inactive'].map((status) => (
+          {(['all', 'active', 'inactive'] as const).map((status) => (
             <TouchableOpacity
               key={status}
               style={[
@@ -248,7 +251,7 @@ export default function CustomerListScreen({ navigation }: any) {
                   borderColor: statusFilter === status ? colors.accent : colors.border,
                 },
               ]}
-              onPress={() => setStatusFilter(status as any)}
+              onPress={() => setStatusFilter(status)}
             >
               <Text
                 style={[

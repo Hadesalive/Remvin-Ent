@@ -13,6 +13,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
+  InteractionManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,41 +22,12 @@ import Svg, { Path, Circle as SvgCircle, Defs, LinearGradient as SvgLinearGradie
 import { Dimensions } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { SalesService } from '../services/sales.service';
-import { Sale, SaleItem } from '../types';
+import { Sale } from '../types';
 import { spacing, fontSize, fontWeight } from '../lib/theme';
 import { format, subDays, startOfDay } from 'date-fns';
 import { Header } from '../components/ui/Header';
 
 const { width } = Dimensions.get('window');
-
-/**
- * Safely parse sale items
- */
-function parseSaleItems(items: string): SaleItem[] {
-  try {
-    if (!items) return [];
-    const parsed = typeof items === 'string' ? JSON.parse(items) : items;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map((item: any) => ({
-      id: item.id || '',
-      // Handle both camelCase (productId) and snake_case (product_id)
-      productId: item.productId || item.product_id || '',
-      // Handle both camelCase (productName) and snake_case (product_name), plus other variants
-      productName: item.productName || item.product_name || item.description || item.name || '',
-      quantity: typeof item.quantity === 'number' ? item.quantity : 0,
-      // Handle both camelCase (price) and snake_case (unit_price)
-      price: typeof item.price === 'number' ? item.price : 
-             (typeof item.unitPrice === 'number' ? item.unitPrice : 
-             (typeof item.unit_price === 'number' ? item.unit_price : 0)),
-      total: typeof item.total === 'number' ? item.total : (typeof item.amount === 'number' ? item.amount : 0),
-      sku: item.sku || undefined,
-      imeis: item.imeis || undefined,
-      inventoryItemIds: item.inventoryItemIds || item.inventory_item_ids || undefined,
-    }));
-  } catch {
-    return [];
-  }
-}
 
 /**
  * Safely format a number
@@ -71,15 +43,26 @@ function formatNumber(value: number | undefined | null): string {
   }
 }
 
+interface SalesChartProps {
+  data: number[];
+  colors: {
+    card: string;
+    mutedForeground: string;
+    shadow?: string;
+    border?: string;
+    foreground?: string;
+  };
+}
+
 /**
  * Sales Chart Component
  */
-function SalesChart({ data, colors }: any) {
+function SalesChart({ data, colors }: SalesChartProps) {
   const chartHeight = 140;
   const chartWidth = width - 48;
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   
-  const validData = data.map((val: any) => {
+  const validData = data.map((val: unknown) => {
     const num = typeof val === 'string' ? parseFloat(val) : Number(val);
     return isNaN(num) || num < 0 ? 0 : num;
   });
@@ -146,7 +129,7 @@ function SalesChart({ data, colors }: any) {
         {linePath && <Path d={linePath} fill="none" stroke="#2563EB" strokeWidth="2.5" />}
         
         {/* Points */}
-        {points.map((p: any, i: number) => (
+        {points.map((p: { x: number; y: number }, i: number) => (
           <SvgCircle 
             key={i} 
             cx={p.x} 
@@ -171,7 +154,14 @@ function SalesChart({ data, colors }: any) {
   );
 }
 
-export default function SalesListScreen({ navigation }: any) {
+interface SalesListScreenProps {
+  navigation: {
+    navigate: (screen: string, params?: Record<string, unknown>) => void;
+    addListener: (event: string, callback: () => void) => () => void;
+  };
+}
+
+export default function SalesListScreen({ navigation }: SalesListScreenProps) {
   const { colors, isDark } = useTheme();
   const [allSales, setAllSales] = useState<Sale[]>([]);
   const [displayedSales, setDisplayedSales] = useState<Sale[]>([]);
@@ -198,8 +188,7 @@ export default function SalesListScreen({ navigation }: any) {
       const data = await SalesService.getSales();
       setAllSales(data);
       setCurrentPage(1); // Reset to first page
-    } catch (error: any) {
-      console.error('Failed to load sales:', error);
+    } catch {
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -324,7 +313,7 @@ export default function SalesListScreen({ navigation }: any) {
 
   const onRefresh = useCallback(() => {
     loadSales(true);
-  }, []);
+  }, [loadSales]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -447,7 +436,6 @@ export default function SalesListScreen({ navigation }: any) {
 
   const renderItem = ({ item, index }: { item: Sale; index: number }) => {
     const isLastItem = index === displayedSales.length - 1;
-    const items = parseSaleItems(item.items);
     const statusColor = getStatusColor(item.status);
 
     return (
@@ -617,7 +605,7 @@ export default function SalesListScreen({ navigation }: any) {
                 if (sortBy === sort) {
                   setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
                 } else {
-                  setSortBy(sort as any);
+                  setSortBy(sort as 'date' | 'amount' | 'customer');
                   setSortOrder('desc');
                 }
               }}

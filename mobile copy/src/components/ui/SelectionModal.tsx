@@ -33,7 +33,7 @@ interface SelectionModalProps {
 export function SelectionModal({
   visible,
   title,
-  options,
+  options = [],
   selectedValue,
   onSelect,
   onClose,
@@ -83,7 +83,7 @@ export function SelectionModal({
                       Loading options...
                     </Text>
                   </View>
-                ) : options.length === 0 ? (
+                ) : (!options || !Array.isArray(options) || options.length === 0) ? (
                   <View style={styles.emptyContainer}>
                     <Ionicons name="list-outline" size={48} color={colors.mutedForeground} />
                     <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
@@ -102,7 +102,7 @@ export function SelectionModal({
                             borderBottomColor: colors.border,
                             backgroundColor: isSelected ? colors.accent + '15' : 'transparent',
                           },
-                          index === options.length - 1 && styles.lastOption,
+                          index === (options?.length || 0) - 1 && styles.lastOption,
                         ]}
                         onPress={() => handleSelect(option.value)}
                         activeOpacity={0.6}

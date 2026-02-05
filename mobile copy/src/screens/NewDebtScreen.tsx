@@ -3,7 +3,7 @@
  * Create a new debt record
  */
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,13 +17,15 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 import { DebtService } from '../services/debt.service';
 import { DatabaseService } from '../services/database.service';
-import { Customer, Product } from '../types';
+import { InventoryItemService } from '../services/inventory-item.service';
+import { Customer, Product, InventoryItem, SaleItem } from '../types';
 import { spacing, fontSize, fontWeight } from '../lib/theme';
+import { SelectionModal } from '../components/ui/SelectionModal';
 
 function formatNumber(value: number | undefined | null): string {
   if (value === null || value === undefined || isNaN(value)) {
@@ -32,8 +34,29 @@ function formatNumber(value: number | undefined | null): string {
   return value.toLocaleString();
 }
 
-export default function NewDebtScreen({ navigation, route }: any) {
+interface DebtItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  price: number;
+  total: number;
+  inventoryItemIds?: string[];
+  imeis?: string[];
+}
+
+interface NewDebtScreenProps {
+  navigation: {
+    goBack: () => void;
+    navigate: (screen: string, params?: Record<string, unknown>) => void;
+  };
+  route?: {
+    params?: Record<string, unknown>;
+  };
+}
+
+export default function NewDebtScreen({ navigation, route }: NewDebtScreenProps) {
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
@@ -47,6 +70,16 @@ export default function NewDebtScreen({ navigation, route }: any) {
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [newCustomerEmail, setNewCustomerEmail] = useState('');
+  
+  // Item selection state
+  const [debtItems, setDebtItems] = useState<DebtItem[]>([]);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
+  const [availableInventoryItems, setAvailableInventoryItems] = useState<InventoryItem[]>([]);
+  const [loadingInventoryItems, setLoadingInventoryItems] = useState(false);
+  const [selectedInventoryItems, setSelectedInventoryItems] = useState<string[]>([]);
 
   useEffect(() => {
     loadData();
@@ -66,12 +99,190 @@ export default function NewDebtScreen({ navigation, route }: any) {
       if (productsRes.data) {
         setProducts(productsRes.data);
       }
-    } catch (error: any) {
-      console.error('Failed to load data:', error);
-      Alert.alert('Error', error.message || 'Failed to load data');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load data';
+      Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Calculate total from items
+  const calculatedTotal = useMemo(() => {
+    return debtItems.reduce((sum, item) => sum + item.total, 0);
+  }, [debtItems]);
+  
+  // Update debt amount when items change
+  useEffect(() => {
+    if (calculatedTotal > 0) {
+      setDebtAmount(calculatedTotal.toFixed(2));
+    }
+  }, [calculatedTotal]);
+  
+  // Filter products for selection
+  const filteredProducts = useMemo(() => {
+    if (!productSearchTerm.trim()) return products.filter(p => p.isActive !== false && (p.stock || 0) > 0);
+    const term = productSearchTerm.toLowerCase();
+    return products.filter(p => 
+      p.isActive !== false && 
+      (p.stock || 0) > 0 &&
+      (p.name.toLowerCase().includes(term) || 
+       p.sku?.toLowerCase().includes(term))
+    );
+  }, [products, productSearchTerm]);
+  
+  // Handle product selection
+  const handleProductSelect = async (productId: string) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+    
+    setShowProductModal(false);
+    setProductSearchTerm('');
+    
+    // Check if product uses IMEI tracking
+    if (product.productModelId) {
+      // Show inventory item selection modal
+      setPendingProduct(product);
+      setSelectedInventoryItems([]);
+      setLoadingInventoryItems(true);
+      setShowInventoryModal(true);
+      
+      // Load available inventory items
+      try {
+        const result = await InventoryItemService.getInventoryItems({
+          productId: product.id,
+          status: 'in_stock'
+        });
+        if (result.data) {
+          // Sort by created_at ascending (oldest first)
+          const sorted = result.data.sort((a, b) => {
+            const dateA = new Date(a.createdAt || 0).getTime();
+            const dateB = new Date(b.createdAt || 0).getTime();
+            return dateA - dateB;
+          });
+          setAvailableInventoryItems(sorted);
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Failed to load inventory items');
+      } finally {
+        setLoadingInventoryItems(false);
+      }
+    } else {
+      // Regular product - add directly
+      const existingItemIndex = debtItems.findIndex(item => item.productId === product.id);
+      if (existingItemIndex >= 0) {
+        // Update quantity
+        const updatedItems = [...debtItems];
+        updatedItems[existingItemIndex].quantity += 1;
+        updatedItems[existingItemIndex].total = updatedItems[existingItemIndex].quantity * updatedItems[existingItemIndex].price;
+        setDebtItems(updatedItems);
+      } else {
+        // Add new item
+        const price = product.price || 0;
+        setDebtItems([...debtItems, {
+          productId: product.id,
+          productName: product.name,
+          quantity: 1,
+          price: price,
+          total: price,
+        }]);
+      }
+    }
+  };
+  
+  // Handle inventory item selection
+  const handleInventoryItemSelect = (inventoryItemId: string) => {
+    if (!pendingProduct) return;
+    
+    const inventoryItem = availableInventoryItems.find(item => item.id === inventoryItemId);
+    if (!inventoryItem) return;
+    
+    // Toggle selection
+    if (selectedInventoryItems.includes(inventoryItemId)) {
+      setSelectedInventoryItems(selectedInventoryItems.filter(id => id !== inventoryItemId));
+    } else {
+      setSelectedInventoryItems([...selectedInventoryItems, inventoryItemId]);
+    }
+  };
+  
+  // Confirm inventory item selection
+  const handleConfirmInventorySelection = () => {
+    if (!pendingProduct || selectedInventoryItems.length === 0) {
+      Alert.alert('Error', 'Please select at least one item');
+      return;
+    }
+    
+    const selectedItems = availableInventoryItems.filter(item => selectedInventoryItems.includes(item.id));
+    const imeis = selectedItems.map(item => item.imei);
+    
+    // Calculate price (use IMEI-specific price, condition-based price, or product price)
+    let price = pendingProduct.price || 0;
+    if (selectedItems.length > 0) {
+      const firstItem = selectedItems[0];
+      if (firstItem.sellingPrice) {
+        price = firstItem.sellingPrice;
+      } else if (pendingProduct.newPrice && firstItem.condition === 'new') {
+        price = pendingProduct.newPrice;
+      } else if (pendingProduct.usedPrice && firstItem.condition === 'used') {
+        price = pendingProduct.usedPrice;
+      } else if (pendingProduct.physicalSimPrice && firstItem.simType === 'physical') {
+        price = pendingProduct.physicalSimPrice;
+      } else if (pendingProduct.eSimPrice && firstItem.simType === 'esim') {
+        price = pendingProduct.eSimPrice;
+      }
+    }
+    
+    const total = price * selectedItems.length;
+    
+    // Add to debt items
+    const existingItemIndex = debtItems.findIndex(item => item.productId === pendingProduct.id);
+    if (existingItemIndex >= 0) {
+      const updatedItems = [...debtItems];
+      const existingItem = updatedItems[existingItemIndex];
+      updatedItems[existingItemIndex] = {
+        ...existingItem,
+        quantity: existingItem.quantity + selectedItems.length,
+        inventoryItemIds: [...(existingItem.inventoryItemIds || []), ...selectedInventoryItems],
+        imeis: [...(existingItem.imeis || []), ...imeis],
+        total: existingItem.total + total,
+      };
+      setDebtItems(updatedItems);
+    } else {
+      setDebtItems([...debtItems, {
+        productId: pendingProduct.id,
+        productName: pendingProduct.name,
+        quantity: selectedItems.length,
+        price: price,
+        total: total,
+        inventoryItemIds: selectedInventoryItems,
+        imeis: imeis,
+      }]);
+    }
+    
+    // Reset state
+    setShowInventoryModal(false);
+    setPendingProduct(null);
+    setSelectedInventoryItems([]);
+    setAvailableInventoryItems([]);
+  };
+  
+  // Remove item from debt
+  const handleRemoveItem = (index: number) => {
+    const updatedItems = debtItems.filter((_, i) => i !== index);
+    setDebtItems(updatedItems);
+  };
+  
+  // Update item quantity
+  const handleUpdateQuantity = (index: number, quantity: number) => {
+    if (quantity <= 0) {
+      handleRemoveItem(index);
+      return;
+    }
+    
+    const updatedItems = [...debtItems];
+    updatedItems[index].quantity = quantity;
+    updatedItems[index].total = updatedItems[index].price * quantity;
+    setDebtItems(updatedItems);
   };
 
   const filteredCustomers = useMemo(() => {
@@ -117,15 +328,17 @@ export default function NewDebtScreen({ navigation, route }: any) {
       setNewCustomerPhone('');
       setNewCustomerEmail('');
       Alert.alert('Success', 'Customer created!');
-    } catch (error: any) {
-      console.error('Error creating customer:', error);
-      Alert.alert('Error', error?.message || 'Failed to create customer');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create customer';
+      Alert.alert('Error', errorMessage);
     }
   };
 
   const handleSubmit = async () => {
-    if (!debtAmount || parseFloat(debtAmount) <= 0) {
-      Alert.alert('Error', 'Please enter a valid debt amount');
+    const finalAmount = debtItems.length > 0 ? calculatedTotal : parseFloat(debtAmount || '0');
+    
+    if (finalAmount <= 0) {
+      Alert.alert('Error', 'Please enter a valid debt amount or add items');
       return;
     }
 
@@ -136,13 +349,63 @@ export default function NewDebtScreen({ navigation, route }: any) {
 
     setSubmitting(true);
     try {
-      await DebtService.createDebt({
+      // Convert debt items to SaleItem format for storage
+      const itemsToStore: SaleItem[] = debtItems.map((item, index) => ({
+        id: `item-${index}`,
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        price: item.price,
+        total: item.total,
+        inventoryItemIds: item.inventoryItemIds,
+        imeis: item.imeis,
+      }));
+      
+      const itemsJson = JSON.stringify(itemsToStore);
+      
+      // Create debt
+      const debt = await DebtService.createDebt({
         customerId: selectedCustomer,
-        amount: parseFloat(debtAmount),
+        amount: finalAmount,
         description: description.trim() || null,
-        items: null,
+        items: itemsJson,
         saleId: null,
       });
+      
+      // Mark inventory items as sold
+      if (debtItems.length > 0) {
+        const soldDate = new Date().toISOString();
+        
+        for (const item of debtItems) {
+          if (item.inventoryItemIds && item.inventoryItemIds.length > 0) {
+            // Mark each inventory item as sold
+            for (const inventoryItemId of item.inventoryItemIds) {
+              try {
+                await InventoryItemService.updateInventoryItem(inventoryItemId, {
+                  status: 'sold',
+                  customerId: selectedCustomer,
+                  soldDate: soldDate,
+                });
+              } catch (inventoryError) {
+                // Continue with other items even if one fails
+              }
+            }
+          } else {
+            // Regular product - update stock
+            try {
+              const product = products.find(p => p.id === item.productId);
+              if (product && !product.productModelId) {
+                const newStock = Math.max(0, (product.stock || 0) - item.quantity);
+                await DatabaseService.updateProduct(item.productId, {
+                  stock: newStock,
+                });
+              }
+            } catch (stockError) {
+              // Continue with other products even if one fails
+            }
+          }
+        }
+      }
 
       Alert.alert('Success', 'Debt created successfully', [
         {
@@ -150,9 +413,9 @@ export default function NewDebtScreen({ navigation, route }: any) {
           onPress: () => navigation.goBack(),
         },
       ]);
-    } catch (error: any) {
-      console.error('Failed to create debt:', error);
-      Alert.alert('Error', error.message || 'Failed to create debt');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create debt';
+      Alert.alert('Error', errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -190,14 +453,15 @@ export default function NewDebtScreen({ navigation, route }: any) {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
-        keyboardVerticalOffset={100}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + spacing.lg, spacing.xl) }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         >
           {/* Customer Selection */}
           <View style={[styles.card, { backgroundColor: colors.card }]}>
@@ -279,6 +543,86 @@ export default function NewDebtScreen({ navigation, route }: any) {
             )}
           </View>
 
+          {/* Items Selection */}
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardHeaderLeft}>
+                <Ionicons name="cube-outline" size={20} color={colors.accent} />
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Items</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.addButtonSmall, { backgroundColor: colors.accent }]}
+                onPress={() => setShowProductModal(true)}
+              >
+                <Ionicons name="add" size={16} color={colors.accentContrast} />
+                <Text style={[styles.addButtonSmallText, { color: colors.accentContrast }]}>Add</Text>
+              </TouchableOpacity>
+            </View>
+
+            {debtItems.length === 0 ? (
+              <View style={styles.emptyItemsContainer}>
+                <Ionicons name="cube-outline" size={48} color={colors.mutedForeground} />
+                <Text style={[styles.emptyItemsText, { color: colors.mutedForeground }]}>
+                  No items added
+                </Text>
+                <Text style={[styles.emptyItemsSubtext, { color: colors.mutedForeground }]}>
+                  Tap "Add" to select products
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.itemsList}>
+                {debtItems.map((item, index) => (
+                  <View key={index} style={[styles.itemRow, { borderBottomColor: colors.border }]}>
+                    <View style={styles.itemInfo}>
+                      <Text style={[styles.itemName, { color: colors.foreground }]} numberOfLines={2}>
+                        {item.productName}
+                      </Text>
+                      {item.imeis && item.imeis.length > 0 && (
+                        <Text style={[styles.itemImei, { color: colors.mutedForeground }]} numberOfLines={1}>
+                          IMEI: {item.imeis.join(', ')}
+                        </Text>
+                      )}
+                      <View style={styles.itemQuantityRow}>
+                        <TouchableOpacity
+                          style={[styles.quantityButton, { backgroundColor: colors.input, borderColor: colors.border }]}
+                          onPress={() => handleUpdateQuantity(index, item.quantity - 1)}
+                        >
+                          <Ionicons name="remove" size={16} color={colors.foreground} />
+                        </TouchableOpacity>
+                        <Text style={[styles.quantityText, { color: colors.foreground }]}>
+                          {item.quantity}
+                        </Text>
+                        <TouchableOpacity
+                          style={[styles.quantityButton, { backgroundColor: colors.input, borderColor: colors.border }]}
+                          onPress={() => handleUpdateQuantity(index, item.quantity + 1)}
+                        >
+                          <Ionicons name="add" size={16} color={colors.foreground} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    <View style={styles.itemRight}>
+                      <Text style={[styles.itemPrice, { color: colors.foreground }]}>
+                        NLe {formatNumber(item.total)}
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.removeButton}
+                        onPress={() => handleRemoveItem(index)}
+                      >
+                        <Ionicons name="trash-outline" size={18} color={colors.error || '#EF4444'} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+                <View style={[styles.itemsTotal, { borderTopColor: colors.border }]}>
+                  <Text style={[styles.itemsTotalLabel, { color: colors.foreground }]}>Total:</Text>
+                  <Text style={[styles.itemsTotalAmount, { color: colors.accent }]}>
+                    NLe {formatNumber(calculatedTotal)}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+
           {/* Debt Amount */}
           <View style={[styles.card, { backgroundColor: colors.card }]}>
             <View style={styles.cardHeader}>
@@ -326,7 +670,7 @@ export default function NewDebtScreen({ navigation, route }: any) {
           <TouchableOpacity
             style={[styles.submitButton, { backgroundColor: colors.accent }]}
             onPress={handleSubmit}
-            disabled={submitting || !selectedCustomer || !debtAmount || parseFloat(debtAmount) <= 0}
+            disabled={submitting || !selectedCustomer || (debtItems.length === 0 && (!debtAmount || parseFloat(debtAmount) <= 0))}
           >
             {submitting ? (
               <ActivityIndicator color={colors.accentContrast} />
@@ -428,6 +772,202 @@ export default function NewDebtScreen({ navigation, route }: any) {
                 disabled={!newCustomerName.trim()}
               >
                 <Text style={[styles.confirmButtonText, { color: colors.accentContrast }]}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Product Selection Modal */}
+      <Modal
+        visible={showProductModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setShowProductModal(false);
+          setProductSearchTerm('');
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalBackdrop} />
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <View style={styles.modalHeaderLeft}>
+                <View style={[styles.modalIcon, { backgroundColor: colors.accent + '20' }]}>
+                  <Ionicons name="cube-outline" size={24} color={colors.accent} />
+                </View>
+                <View>
+                  <Text style={[styles.modalTitle, { color: colors.foreground }]}>Select Product</Text>
+                  <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]}>
+                    Choose a product to add
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => {
+                setShowProductModal(false);
+                setProductSearchTerm('');
+              }}>
+                <Ionicons name="close" size={24} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.searchContainer, { backgroundColor: colors.input, borderColor: colors.border }]}>
+              <Ionicons name="search-outline" size={18} color={colors.mutedForeground} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.foreground }]}
+                placeholder="Search products..."
+                placeholderTextColor={colors.mutedForeground}
+                value={productSearchTerm}
+                onChangeText={setProductSearchTerm}
+              />
+            </View>
+
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              {filteredProducts.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="cube-outline" size={48} color={colors.mutedForeground} />
+                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                    No products found
+                  </Text>
+                </View>
+              ) : (
+                filteredProducts.map((product) => (
+                  <TouchableOpacity
+                    key={product.id}
+                    style={[styles.productItemRow, { borderBottomColor: colors.border }]}
+                    onPress={() => handleProductSelect(product.id)}
+                  >
+                    <View style={styles.productItemInfo}>
+                      <Text style={[styles.productItemName, { color: colors.foreground }]}>
+                        {product.name}
+                      </Text>
+                      <Text style={[styles.productItemDetails, { color: colors.mutedForeground }]}>
+                        Stock: {product.stock || 0} • NLe {formatNumber(product.price)}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={colors.mutedForeground} />
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Inventory Item Selection Modal */}
+      <Modal
+        visible={showInventoryModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setShowInventoryModal(false);
+          setPendingProduct(null);
+          setSelectedInventoryItems([]);
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalBackdrop} />
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <View style={styles.modalHeaderLeft}>
+                <View style={[styles.modalIcon, { backgroundColor: colors.accent + '20' }]}>
+                  <Ionicons name="cube" size={24} color={colors.accent} />
+                </View>
+                <View>
+                  <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+                    Select {pendingProduct?.name || 'Items'}
+                  </Text>
+                  <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]}>
+                    Choose specific inventory items
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => {
+                setShowInventoryModal(false);
+                setPendingProduct(null);
+                setSelectedInventoryItems([]);
+              }}>
+                <Ionicons name="close" size={24} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              {loadingInventoryItems ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={colors.accent} />
+                  <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
+                    Loading items...
+                  </Text>
+                </View>
+              ) : availableInventoryItems.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="cube-outline" size={48} color={colors.mutedForeground} />
+                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                    No items available
+                  </Text>
+                </View>
+              ) : (
+                availableInventoryItems.map((item) => {
+                  const isSelected = selectedInventoryItems.includes(item.id);
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[
+                        styles.inventoryItemRow,
+                        { 
+                          borderBottomColor: colors.border,
+                          backgroundColor: isSelected ? colors.accent + '15' : 'transparent',
+                        },
+                      ]}
+                      onPress={() => handleInventoryItemSelect(item.id)}
+                    >
+                      <View style={styles.inventoryItemInfo}>
+                        <Text style={[styles.inventoryItemImei, { color: colors.foreground }]}>
+                          IMEI: {item.imei}
+                        </Text>
+                        <Text style={[styles.inventoryItemDetails, { color: colors.mutedForeground }]}>
+                          {item.condition} • {item.simType || 'N/A'}
+                        </Text>
+                        {item.sellingPrice && (
+                          <Text style={[styles.inventoryItemPrice, { color: colors.accent }]}>
+                            NLe {formatNumber(item.sellingPrice)}
+                          </Text>
+                        )}
+                      </View>
+                      {isSelected && (
+                        <Ionicons name="checkmark-circle" size={24} color={colors.accent} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+
+            <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton, { borderColor: colors.border }]}
+                onPress={() => {
+                  setShowInventoryModal(false);
+                  setPendingProduct(null);
+                  setSelectedInventoryItems([]);
+                }}
+              >
+                <Text style={[styles.cancelButtonText, { color: colors.foreground }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton, { backgroundColor: colors.accent }]}
+                onPress={handleConfirmInventorySelection}
+                disabled={selectedInventoryItems.length === 0}
+              >
+                <Text style={[styles.confirmButtonText, { color: colors.accentContrast }]}>
+                  Add {selectedInventoryItems.length > 0 ? `(${selectedInventoryItems.length})` : ''}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -685,6 +1225,138 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     fontSize: fontSize.base,
     fontWeight: fontWeight.semibold,
+  },
+  emptyItemsContainer: {
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  emptyItemsText: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.medium,
+  },
+  emptyItemsSubtext: {
+    fontSize: fontSize.sm,
+  },
+  itemsList: {
+    gap: spacing.xs,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  itemInfo: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  itemName: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.medium,
+    marginBottom: spacing.xs,
+  },
+  itemImei: {
+    fontSize: fontSize.xs,
+    marginBottom: spacing.xs,
+  },
+  itemQuantityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  quantityButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quantityText: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.semibold,
+    minWidth: 30,
+    textAlign: 'center',
+  },
+  itemRight: {
+    alignItems: 'flex-end',
+    gap: spacing.xs,
+  },
+  itemPrice: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.semibold,
+  },
+  removeButton: {
+    padding: spacing.xs,
+  },
+  itemsTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: spacing.md,
+    marginTop: spacing.sm,
+    borderTopWidth: 2,
+  },
+  itemsTotalLabel: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+  },
+  itemsTotalAmount: {
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
+  },
+  inventoryItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  inventoryItemInfo: {
+    flex: 1,
+  },
+  inventoryItemImei: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.medium,
+    marginBottom: spacing.xs,
+  },
+  inventoryItemDetails: {
+    fontSize: fontSize.sm,
+    marginBottom: spacing.xs,
+  },
+  inventoryItemPrice: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.semibold,
+  },
+  productItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  productItemInfo: {
+    flex: 1,
+  },
+  productItemName: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.medium,
+    marginBottom: spacing.xs,
+  },
+  productItemDetails: {
+    fontSize: fontSize.sm,
+  },
+  emptyContainer: {
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  emptyText: {
+    fontSize: fontSize.base,
+    textAlign: 'center',
   },
 });
 

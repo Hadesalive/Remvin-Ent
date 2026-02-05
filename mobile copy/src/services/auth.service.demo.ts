@@ -80,7 +80,6 @@ export const DemoAuthService = {
       await SecureStore.deleteItemAsync(SESSION_KEY);
       return { error: null };
     } catch (e) {
-      console.error('DemoAuthService signOut error:', e);
       return { error: e };
     }
   },

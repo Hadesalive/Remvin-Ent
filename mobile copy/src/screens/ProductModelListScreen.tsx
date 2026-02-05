@@ -32,19 +32,23 @@ export default function ProductModelListScreen({ navigation }: any) {
 
   useEffect(() => {
     loadModels();
-  }, []);
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadModels();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const loadModels = async () => {
     try {
       setLoading(true);
       const result = await ProductModelService.getProductModels();
       if (result.error) {
-        console.error('Error loading models:', result.error);
+
       } else if (result.data) {
         setModels(result.data);
       }
     } catch (error: any) {
-      console.error('Failed to load models:', error);
+
     } finally {
       setLoading(false);
       setRefreshing(false);

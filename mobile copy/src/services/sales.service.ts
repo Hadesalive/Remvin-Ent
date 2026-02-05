@@ -24,7 +24,6 @@ function parseSaleItems(items: string): SaleItem[] {
     const parsed = typeof items === 'string' ? JSON.parse(items) : items;
     return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
-    console.error('Error parsing sale items:', error);
     return [];
   }
 }
@@ -64,7 +63,6 @@ export const SalesService = {
         updatedAt: sale.updated_at,
       }));
     } catch (error) {
-      console.error('Error fetching sales:', error);
       throw error;
     }
   },
@@ -120,7 +118,6 @@ export const SalesService = {
         total: count || 0,
       };
     } catch (error) {
-      console.error('Error fetching paginated sales:', error);
       throw error;
     }
   },
@@ -161,7 +158,6 @@ export const SalesService = {
         updatedAt: data.updated_at,
       };
     } catch (error) {
-      console.error('Error fetching sale:', error);
       throw error;
     }
   },
@@ -249,7 +245,6 @@ export const SalesService = {
                 }
                 
                 if (itemsToMark.length !== item.imeis.length) {
-                  console.warn(`Warning: Only found ${itemsToMark.length} of ${item.imeis.length} requested IMEIs for product ${product.name}`);
                 }
               } else if (item.inventoryItemIds && item.inventoryItemIds.length > 0) {
                 // Use inventory item IDs if provided
@@ -288,7 +283,6 @@ export const SalesService = {
               }
               
               // Stock is automatically recalculated from inventory_items (done in DatabaseService.getProducts)
-              console.log(`Marked ${itemsToMark.length} inventory items as sold for product ${product.name}`);
             } else {
               // For regular products: Update stock manually
               const newStock = Math.max(0, (product.stock || 0) - item.quantity);
@@ -297,7 +291,6 @@ export const SalesService = {
               });
             }
           } catch (stockError) {
-            console.error(`Error updating stock for product ${item.productId}:`, stockError);
             // Continue with other products even if one fails
           }
         }
@@ -324,7 +317,6 @@ export const SalesService = {
         updatedAt: data.updated_at,
       };
     } catch (error) {
-      console.error('Error creating sale:', error);
       throw error;
     }
   },
@@ -370,12 +362,10 @@ export const SalesService = {
                   });
                 }
               } catch (stockError) {
-                console.error(`Error restoring stock for product ${item.productId}:`, stockError);
               }
             }
           }
         } catch (parseError) {
-          console.error('Error parsing original sale items:', parseError);
         }
       }
 
@@ -414,7 +404,6 @@ export const SalesService = {
               });
             }
           } catch (stockError) {
-            console.error(`Error updating stock for product ${item.productId}:`, stockError);
           }
         }
       }
@@ -440,7 +429,7 @@ export const SalesService = {
         updatedAt: data.updated_at,
       };
     } catch (error) {
-      console.error('Error updating sale:', error);
+
       throw error;
     }
   },
@@ -481,7 +470,6 @@ export const SalesService = {
                         customerId: null,
                       });
                     } catch (inventoryError) {
-                      console.error(`Error restoring inventory item ${inventoryItemId}:`, inventoryError);
                     }
                   }
                 } else {
@@ -492,7 +480,6 @@ export const SalesService = {
                   });
                 }
               } catch (stockError) {
-                console.error(`Error restoring stock for product ${item.productId}:`, stockError);
               }
             }
           }
@@ -525,12 +512,10 @@ export const SalesService = {
                 }
               }
             } catch (creditError) {
-              console.error('Error restoring customer credit:', creditError);
               // Don't throw - continue with sale deletion even if credit restoration fails
             }
           }
         } catch (parseError) {
-          console.error('Error parsing sale items:', parseError);
         }
       }
 
@@ -542,7 +527,6 @@ export const SalesService = {
 
       if (error) throw error;
     } catch (error) {
-      console.error('Error deleting sale:', error);
       throw error;
     }
   },

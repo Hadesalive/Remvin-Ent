@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { spacing, fontSize, fontWeight } from '../../lib/theme';
@@ -20,23 +20,16 @@ export const DashboardHeader = ({ user }: any) => {
     return 'phone-portrait'; // System
   };
 
-  const getInitials = (name?: string) => {
-    if (!name) return 'U';
-    const parts = name.split(' ');
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-    }
-    return name[0].toUpperCase();
-  };
-
   return (
     <View style={styles.header}>
       <View style={styles.headerLeft}>
-        {/* Avatar */}
+        {/* Logo Avatar */}
         <View style={[styles.avatar, { backgroundColor: colors.accent + '15', borderColor: colors.accent + '20' }]}>
-          <Text style={[styles.avatarText, { color: colors.accent }]}>
-            {getInitials(user?.fullName || user?.username)}
-          </Text>
+          <Image
+            source={require('../../../assets/icon.png')}
+            style={styles.avatarImage}
+            resizeMode="contain"
+          />
         </View>
 
         {/* Greeting */}
@@ -92,10 +85,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
+    overflow: 'hidden',
   },
-  avatarText: {
-    fontSize: 16,
-    fontWeight: fontWeight.semibold,
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   greetingContainer: {
     gap: 2,

@@ -95,22 +95,17 @@ export default function NewSaleScreen({ navigation, route }: any) {
       ]);
       
       if (customersRes.error) {
-        console.error('Error loading customers:', customersRes.error);
       } else if (customersRes.data) {
         setCustomers(customersRes.data);
       }
       
       if (productsRes.error) {
-        console.error('Error loading products:', productsRes.error);
         Alert.alert('Error', `Failed to load products: ${productsRes.error.message || 'Unknown error'}`);
       } else if (productsRes.data) {
         setProducts(productsRes.data);
-        console.log(`Loaded ${productsRes.data.length} products`);
       } else {
-        console.log('No products data returned');
       }
     } catch (error: any) {
-      console.error('Failed to load data:', error);
       Alert.alert('Error', error.message || 'Failed to load data');
     } finally {
       setLoading(false);
@@ -128,13 +123,11 @@ export default function NewSaleScreen({ navigation, route }: any) {
     try {
       const { data, error } = await DatabaseService.getCustomerById(customerId);
       if (error || !data) {
-        console.error('Error loading customer credit:', error);
         setCustomerCredit(0);
         return;
       }
       setCustomerCredit(data.storeCredit || 0);
     } catch (error: any) {
-      console.error('Failed to load customer credit:', error);
       setCustomerCredit(0);
     }
   };
@@ -169,7 +162,6 @@ export default function NewSaleScreen({ navigation, route }: any) {
           }));
         }
       } catch (e) {
-        console.error('Error parsing sale items:', e);
       }
 
       // Pre-populate all fields
@@ -187,7 +179,6 @@ export default function NewSaleScreen({ navigation, route }: any) {
       setTaxEnabled((sale.tax || 0) > 0);
       setNotes(sale.notes || '');
     } catch (error: any) {
-      console.error('Failed to load sale:', error);
       Alert.alert('Error', 'Failed to load sale data');
       navigation.goBack();
     } finally {
@@ -250,7 +241,6 @@ export default function NewSaleScreen({ navigation, route }: any) {
           setAvailableInventoryItems(sorted);
         }
       } catch (error) {
-        console.error('Error loading inventory items:', error);
         Alert.alert('Error', 'Failed to load inventory items');
       } finally {
         setLoadingInventoryItems(false);
@@ -305,10 +295,16 @@ export default function NewSaleScreen({ navigation, route }: any) {
     selectedItems.forEach(item => {
       let itemPrice = pendingProduct.price; // Default to product price
       
-      // Priority: IMEI-specific selling price > SIM type price > product price
+      // Priority: IMEI-specific selling price > Condition-based price > SIM type price > product price
       if (item.sellingPrice !== null && item.sellingPrice !== undefined && item.sellingPrice > 0) {
         // Use IMEI-specific selling price (for trade-in items with condition-based pricing)
         itemPrice = item.sellingPrice;
+      } else if (item.condition === 'new' && pendingProduct.newPrice !== null && pendingProduct.newPrice !== undefined && pendingProduct.newPrice > 0) {
+        // Use new condition price
+        itemPrice = pendingProduct.newPrice;
+      } else if (item.condition === 'used' && pendingProduct.usedPrice !== null && pendingProduct.usedPrice !== undefined && pendingProduct.usedPrice > 0) {
+        // Use used condition price
+        itemPrice = pendingProduct.usedPrice;
       } else if (item.simType === 'physical' && pendingProduct.physicalSimPrice !== null && pendingProduct.physicalSimPrice !== undefined) {
         itemPrice = pendingProduct.physicalSimPrice;
       } else if (item.simType === 'esim' && pendingProduct.eSimPrice !== null && pendingProduct.eSimPrice !== undefined) {
@@ -434,7 +430,6 @@ export default function NewSaleScreen({ navigation, route }: any) {
       setNewCustomerEmail('');
       Alert.alert('Success', 'Customer created!');
     } catch (error: any) {
-      console.error('Error creating customer:', error);
       Alert.alert('Error', error?.message || 'Failed to create customer');
     }
   };
@@ -481,7 +476,6 @@ export default function NewSaleScreen({ navigation, route }: any) {
       setNewProductDescription('');
       Alert.alert('Success', 'Product created and added to cart!');
     } catch (error: any) {
-      console.error('Error creating product:', error);
       Alert.alert('Error', error?.message || 'Failed to create product');
     }
   };
@@ -540,7 +534,6 @@ export default function NewSaleScreen({ navigation, route }: any) {
         const { data: latestCustomerData, error: customerError } = await DatabaseService.getCustomerById(selectedCustomer);
         
         if (customerError || !latestCustomerData) {
-          console.error('Error fetching customer for credit deduction:', customerError);
           Alert.alert('Error', 'Failed to fetch customer data for credit deduction');
           return;
         }

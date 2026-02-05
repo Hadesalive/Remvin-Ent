@@ -1,7 +1,7 @@
 /**
  * Authentication Context
  * Handles user authentication, session management, and RBAC
- * Remvin Enterprise LTD Sales Manager
+ * Remvin Enterprise Sales Manager
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';

@@ -72,18 +72,6 @@ export const StatsGrid = ({ stats, showAllOnTablet = true }: any) => {
   // Show 4 on phone, 5 on tablet
   const displayStats = (isTablet || isLargeTablet) ? stats.slice(0, 5) : stats.slice(0, 4);
   
-  // Debug logging (can be removed in production)
-  if (__DEV__) {
-    console.log('StatsGrid Debug:', { 
-      width, 
-      isPhone, 
-      isTablet, 
-      isLargeTablet, 
-      totalStats: stats.length, 
-      displayingStats: displayStats.length,
-      statsLabels: stats.map((s: any) => s.label)
-    });
-  }
   
   // Calculate spacing and widths
   const gap = (isTablet || isLargeTablet) ? 16 : 12;

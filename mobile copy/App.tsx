@@ -1,6 +1,6 @@
 /**
  * Main App Component
- * Remvin Enterprise LTD Mobile App
+ * Remvin Enterprise Mobile App
  */
 
 import React from 'react';
@@ -45,6 +45,16 @@ import NewProductModelScreen from './src/screens/NewProductModelScreen';
 import InventoryItemListScreen from './src/screens/InventoryItemListScreen';
 import NewInventoryItemScreen from './src/screens/NewInventoryItemScreen';
 import ReportsScreen from './src/screens/ReportsScreen';
+import ReturnsListScreen from './src/screens/ReturnsListScreen';
+import ReturnDetailScreen from './src/screens/ReturnDetailScreen';
+import NewReturnScreen from './src/screens/NewReturnScreen';
+import NotesListScreen from './src/screens/NotesListScreen';
+import NoteDetailScreen from './src/screens/NoteDetailScreen';
+import NewNoteScreen from './src/screens/NewNoteScreen';
+import InvoiceListScreen from './src/screens/InvoiceListScreen';
+import InvoiceDetailScreen from './src/screens/InvoiceDetailScreen';
+import UserListScreen from './src/screens/UserListScreen';
+import NewUserScreen from './src/screens/NewUserScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -249,6 +259,17 @@ function NavigationContent({ isAuthenticated }: { isAuthenticated: boolean }) {
             <Stack.Screen name="NewProductModel" component={NewProductModelScreen} />
             <Stack.Screen name="InventoryItemList" component={InventoryItemListScreen} />
             <Stack.Screen name="NewInventoryItem" component={NewInventoryItemScreen} />
+            <Stack.Screen name="ReturnsList" component={ReturnsListScreen} />
+            <Stack.Screen name="ReturnDetail" component={ReturnDetailScreen} />
+            <Stack.Screen name="NewReturn" component={NewReturnScreen} />
+            <Stack.Screen name="NotesList" component={NotesListScreen} />
+            <Stack.Screen name="NoteDetail" component={NoteDetailScreen} />
+            <Stack.Screen name="NewNote" component={NewNoteScreen} />
+            <Stack.Screen name="InvoiceList" component={InvoiceListScreen} />
+            <Stack.Screen name="InvoiceDetail" component={InvoiceDetailScreen} />
+            <Stack.Screen name="NewInvoice" component={InvoiceEditorScreen} />
+            <Stack.Screen name="UserList" component={UserListScreen} />
+            <Stack.Screen name="NewUser" component={NewUserScreen} />
             <Stack.Screen name="Reports" component={ReportsScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
           </>
